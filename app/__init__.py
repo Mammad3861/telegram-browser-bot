@@ -1,0 +1,1 @@
+"""Telegram Browser Bot application."""
