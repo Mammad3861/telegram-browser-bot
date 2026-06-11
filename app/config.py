@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     screenshot_viewport_width: int = 1366
     screenshot_viewport_height: int = 768
     max_screenshot_size_mb: int = 20
+    max_pdf_size_mb: int = 30
+    pdf_format: str = "A4"
+    pdf_print_background: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
