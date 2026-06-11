@@ -43,3 +43,20 @@ python -m pytest
 Copy-Item .env.example .env
 docker compose up --build
 ```
+
+## Planned Features
+
+- HTML export as `.html` or `.html.gz`
+- File download with storage-aware limits
+- Admin-only access control
+- User allowlist
+- Per-user rate limits
+- Server disk-space detection
+- Docker deployment
+- Future support for Cloudflare Worker / Pages compatibility
+- Playwright-based screenshots and PDF export
+
+
+## Project Status
+
+This project is in early development. It is currently suitable for local testing and controlled usage only. Public deployment requires rate limiting, access control, storage limits, and stronger abuse protection.
