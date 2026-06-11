@@ -2,15 +2,15 @@
 
 > Early development / MVP. This project is currently experimental and not ready for public production use.
 
-A Telegram bot for fetching web pages, extracting links, exporting HTML, and safely downloading direct file URLs.
+A Telegram bot for fetching web pages, extracting links, exporting HTML, safely downloading direct files, and capturing full-page screenshots.
 
 ## Version
 
-v0.4.0
+v0.5.0
 
 ## Features
 
-- Telegram bot commands: `/start`, `/help`, `/whoami`, `/access`, `/fetch`, `/links`, `/html`, `/download`, `/status`, `/jobs`, `/cancel`
+- Telegram bot commands: `/start`, `/help`, `/whoami`, `/access`, `/fetch`, `/links`, `/html`, `/download`, `/screenshot`, `/status`, `/jobs`, `/cancel`
 - Secure URL validation
 - Basic SSRF protection
 - Public/private Telegram command access control
@@ -20,6 +20,7 @@ v0.4.0
 - HTML export as `.html` or `.html.gz`
 - Streaming direct-file downloads with SHA256 metadata
 - In-memory background jobs with global and per-user concurrency limits
+- Playwright Chromium full-page PNG screenshots
 - Disk-space checks before saving HTML and downloaded files
 - FastAPI health endpoint
 - Docker Compose skeleton
@@ -32,7 +33,10 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
 Copy-Item .env.example .env
+python -m playwright install chromium
 ```
+
+Playwright installs with the project, but Chromium must be installed separately with the command above. The application never downloads browsers automatically at runtime.
 
 Set `TELEGRAM_BOT_TOKEN` and at least one ID in `ADMIN_TELEGRAM_IDS` inside `.env`, then run:
 
@@ -51,6 +55,7 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/links <url>` - extract links from a web page
 - `/html <url>` - save and send page HTML
 - `/download <url>` - download and send a direct file URL
+- `/screenshot <url>` - capture and send a full-page PNG screenshot
 - `/status <job_id>` - show progress and result for a job
 - `/jobs` - list recent jobs (admins see all jobs)
 - `/cancel <job_id>` - cancel an active job
@@ -65,7 +70,7 @@ ADMIN_TELEGRAM_IDS=123456789
 ALLOWED_TELEGRAM_IDS=123456789,987654321
 ```
 
-`/start`, `/help`, and `/whoami` are public. `/fetch`, `/links`, `/html`, `/download`, `/status`, `/jobs`, and `/cancel` require an admin or allowed user. `/access` is admin-only. If `ALLOWED_TELEGRAM_IDS` is empty, only admins can use protected commands.
+`/start`, `/help`, and `/whoami` are public. `/fetch`, `/links`, `/html`, `/download`, `/screenshot`, `/status`, `/jobs`, and `/cancel` require an admin or allowed user. `/access` is admin-only. If `ALLOWED_TELEGRAM_IDS` is empty, only admins can use protected commands.
 
 Access is configured through environment variables in v0.3; database-based user management is not implemented yet.
 
@@ -82,6 +87,10 @@ TELEGRAM_MAX_UPLOAD_SIZE_MB=50
 MAX_DOWNLOADS_PER_USER_PER_DAY=10
 MAX_CONCURRENT_JOBS_GLOBAL=3
 MAX_CONCURRENT_JOBS_PER_USER=1
+BROWSER_TIMEOUT_SECONDS=45
+SCREENSHOT_VIEWPORT_WIDTH=1366
+SCREENSHOT_VIEWPORT_HEIGHT=768
+MAX_SCREENSHOT_SIZE_MB=20
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
@@ -90,9 +99,9 @@ v0.4 supports direct file URLs only. It does not scrape HTML pages to discover d
 
 ## Background Jobs
 
-`/html` and `/download` run as background jobs. The bot immediately returns a short job ID, and `/status`, `/jobs`, and `/cancel` can be used to manage the work. Users can only view and cancel their own jobs; admins can manage any job.
+`/html`, `/download`, and `/screenshot` run as background jobs. The bot immediately returns a short job ID, and `/status`, `/jobs`, and `/cancel` can be used to manage the work. Users can only view and cancel their own jobs; admins can manage any job.
 
-Jobs are stored in memory in v0.4 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
+Jobs are stored in memory in v0.5 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
 
 ## Tests
 
@@ -103,7 +112,8 @@ python -m pytest
 ## Troubleshooting
 
 - Some sites block automated requests and return HTTP 403.
-- Some sites require JavaScript rendering, which is not supported in v0.4.
+- Some sites block or challenge headless browsers. This project does not bypass CAPTCHAs or anti-bot systems.
+- JavaScript-heavy sites may work better with `/screenshot` than `/fetch` or `/html`.
 - Some content requires login or an existing session, which is not supported yet.
 - VPN, proxy, firewall, DNS, or other network restrictions can cause connection errors.
 
@@ -114,12 +124,14 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
+The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.5 does not automate that setup.
+
 ## Planned Features
 
 - Scraping pages for download links
 - Docker deployment
 - Future support for Cloudflare Worker / Pages compatibility
-- Playwright-based screenshots and PDF export
+- Playwright-based PDF export
 
 
 ## Project Status

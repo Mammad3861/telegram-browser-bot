@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     max_downloads_per_user_per_day: int = 10
     max_concurrent_jobs_global: int = 3
     max_concurrent_jobs_per_user: int = 1
+    browser_timeout_seconds: float = 45.0
+    screenshot_viewport_width: int = 1366
+    screenshot_viewport_height: int = 768
+    max_screenshot_size_mb: int = 20
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

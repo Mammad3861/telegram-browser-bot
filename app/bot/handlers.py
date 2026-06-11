@@ -13,6 +13,14 @@ from app.core.jobs import Job, JobLimitError, job_store
 from app.core.storage import StorageError
 from app.core.url_validation import URLValidationError, validate_url
 from app.fetchers.http_fetcher import FetchError, HttpFetcher
+from app.fetchers.browser_screenshot import (
+    BrowserNotInstalledError,
+    ScreenshotError,
+    ScreenshotOptions,
+    ScreenshotTimeoutError,
+    ScreenshotTooLargeError,
+    capture_screenshot,
+)
 from app.fetchers.file_downloader import DownloadError, FileDownloader
 from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
@@ -25,6 +33,7 @@ HELP_TEXT = (
     "/links <url> - list links from a web page\n"
     "/html <url> - export page HTML\n"
     "/download <url> - download a direct file link\n"
+    "/screenshot <url> - capture a full-page PNG\n"
     "/status <job_id> - show job status\n"
     "/jobs - list recent jobs\n"
     "/cancel <job_id> - cancel an active job\n"
@@ -257,6 +266,72 @@ async def run_download_job(job: Job, message: Message) -> None:
         await fail_job(job.id, message, str(exc))
     except Exception:
         await fail_job(job.id, message, "Job failed unexpectedly")
+
+
+@router.message(Command("screenshot"))
+async def screenshot_handler(message: Message, command: CommandObject) -> None:
+    if await reject_unless_allowed(message):
+        return
+    if not command.args:
+        await message.answer("Usage: /screenshot <url>")
+        return
+
+    try:
+        url = validate_url(command.args.strip())
+        job = create_background_job(message, "screenshot", url)
+        await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
+        task = asyncio.create_task(run_screenshot_job(job, message))
+        job_store.register_task(job.id, task)
+    except (URLValidationError, JobLimitError) as exc:
+        await message.answer(f"Error: {exc}")
+
+
+async def run_screenshot_job(job: Job, message: Message) -> None:
+    settings = get_settings()
+    job_store.update_job(job.id, status="running", progress=10)
+    options = ScreenshotOptions(
+        timeout_seconds=settings.browser_timeout_seconds,
+        viewport_width=settings.screenshot_viewport_width,
+        viewport_height=settings.screenshot_viewport_height,
+        max_size_mb=settings.max_screenshot_size_mb,
+        minimum_free_mb=settings.min_free_disk_mb,
+    )
+    try:
+        result = await capture_screenshot(
+            job.url, Path(settings.downloads_dir), options
+        )
+        job_store.update_job(job.id, progress=90)
+        await message.answer_document(
+            FSInputFile(result.path),
+            caption=(
+                f"Filename: {result.filename}\n"
+                f"Size: {result.size_bytes} bytes\n"
+                f"Final URL: {result.final_url}"
+            ),
+        )
+        job_store.update_job(
+            job.id,
+            status="success",
+            progress=100,
+            result_message=f"Screenshot captured and sent: {result.filename}",
+        )
+    except asyncio.CancelledError:
+        if (current := job_store.get_job(job.id)) and current.status != "cancelled":
+            job_store.update_job(job.id, status="cancelled")
+        raise
+    except (
+        URLValidationError,
+        BrowserNotInstalledError,
+        ScreenshotTimeoutError,
+        ScreenshotTooLargeError,
+        ScreenshotError,
+        StorageError,
+        OSError,
+        TelegramAPIError,
+    ) as exc:
+        await fail_job(job.id, message, str(exc))
+    except Exception:
+        await fail_job(job.id, message, "Screenshot job failed unexpectedly")
 
 
 async def fail_job(job_id: str, message: Message, error: str) -> None:
