@@ -26,9 +26,17 @@ DEFAULT_HEADERS = {
 
 
 class HttpFetcher:
-    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        transport: httpx.AsyncBaseTransport | None = None,
+        max_response_bytes: int | None = None,
+    ) -> None:
         settings = get_settings()
-        self.max_response_bytes = settings.max_response_bytes
+        self.max_response_bytes = (
+            settings.max_response_bytes
+            if max_response_bytes is None
+            else max_response_bytes
+        )
         self.client = httpx.AsyncClient(
             timeout=settings.request_timeout_seconds,
             follow_redirects=False,
@@ -80,7 +88,7 @@ class HttpFetcher:
                     content = bytearray()
                     async for chunk in response.aiter_bytes():
                         content.extend(chunk)
-                        if len(content) > self.max_response_bytes:
+                        if self.max_response_bytes > 0 and len(content) > self.max_response_bytes:
                             raise FetchError("Response is too large")
                     return httpx.Response(
                         status_code=response.status_code,
