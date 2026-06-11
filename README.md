@@ -6,11 +6,11 @@ A Telegram bot for fetching web pages, extracting links, exporting HTML, and saf
 
 ## Version
 
-v0.3.0
+v0.4.0
 
 ## Features
 
-- Telegram bot commands: `/start`, `/help`, `/whoami`, `/access`, `/fetch`, `/links`, `/html`, `/download`
+- Telegram bot commands: `/start`, `/help`, `/whoami`, `/access`, `/fetch`, `/links`, `/html`, `/download`, `/status`, `/jobs`, `/cancel`
 - Secure URL validation
 - Basic SSRF protection
 - Public/private Telegram command access control
@@ -19,6 +19,7 @@ v0.3.0
 - Link extraction with BeautifulSoup
 - HTML export as `.html` or `.html.gz`
 - Streaming direct-file downloads with SHA256 metadata
+- In-memory background jobs with global and per-user concurrency limits
 - Disk-space checks before saving HTML and downloaded files
 - FastAPI health endpoint
 - Docker Compose skeleton
@@ -50,6 +51,9 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/links <url>` - extract links from a web page
 - `/html <url>` - save and send page HTML
 - `/download <url>` - download and send a direct file URL
+- `/status <job_id>` - show progress and result for a job
+- `/jobs` - list recent jobs (admins see all jobs)
+- `/cancel <job_id>` - cancel an active job
 - `/access` - show access settings (admins only)
 
 ## Access Control
@@ -61,7 +65,7 @@ ADMIN_TELEGRAM_IDS=123456789
 ALLOWED_TELEGRAM_IDS=123456789,987654321
 ```
 
-`/start`, `/help`, and `/whoami` are public. `/fetch`, `/links`, `/html`, and `/download` require an admin or allowed user. `/access` is admin-only. If `ALLOWED_TELEGRAM_IDS` is empty, only admins can use protected commands.
+`/start`, `/help`, and `/whoami` are public. `/fetch`, `/links`, `/html`, `/download`, `/status`, `/jobs`, and `/cancel` require an admin or allowed user. `/access` is admin-only. If `ALLOWED_TELEGRAM_IDS` is empty, only admins can use protected commands.
 
 Access is configured through environment variables in v0.3; database-based user management is not implemented yet.
 
@@ -76,11 +80,19 @@ MIN_FREE_DISK_MB=512
 MAX_DOWNLOAD_SIZE_MB=50
 TELEGRAM_MAX_UPLOAD_SIZE_MB=50
 MAX_DOWNLOADS_PER_USER_PER_DAY=10
+MAX_CONCURRENT_JOBS_GLOBAL=3
+MAX_CONCURRENT_JOBS_PER_USER=1
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
 
-v0.3 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
+v0.4 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
+
+## Background Jobs
+
+`/html` and `/download` run as background jobs. The bot immediately returns a short job ID, and `/status`, `/jobs`, and `/cancel` can be used to manage the work. Users can only view and cancel their own jobs; admins can manage any job.
+
+Jobs are stored in memory in v0.4 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
 
 ## Tests
 
@@ -91,7 +103,7 @@ python -m pytest
 ## Troubleshooting
 
 - Some sites block automated requests and return HTTP 403.
-- Some sites require JavaScript rendering, which is not supported in v0.3.
+- Some sites require JavaScript rendering, which is not supported in v0.4.
 - Some content requires login or an existing session, which is not supported yet.
 - VPN, proxy, firewall, DNS, or other network restrictions can cause connection errors.
 
