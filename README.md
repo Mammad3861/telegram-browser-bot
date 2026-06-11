@@ -2,15 +2,15 @@
 
 > Early development / MVP. This project is currently experimental and not ready for public production use.
 
-A Telegram bot for fetching web pages, extracting links, exporting HTML, and building toward downloads, screenshots, PDFs, and authenticated browser sessions.
+A Telegram bot for fetching web pages, extracting links, exporting HTML, and safely downloading direct file URLs.
 
 ## Version
 
-v0.2.0
+v0.3.0
 
 ## Features
 
-- Telegram bot commands: `/start`, `/help`, `/whoami`, `/access`, `/fetch`, `/links`, `/html`
+- Telegram bot commands: `/start`, `/help`, `/whoami`, `/access`, `/fetch`, `/links`, `/html`, `/download`
 - Secure URL validation
 - Basic SSRF protection
 - Public/private Telegram command access control
@@ -18,7 +18,8 @@ v0.2.0
 - Web page fetching with HTTPX
 - Link extraction with BeautifulSoup
 - HTML export as `.html` or `.html.gz`
-- Disk-space check before saving HTML files
+- Streaming direct-file downloads with SHA256 metadata
+- Disk-space checks before saving HTML and downloaded files
 - FastAPI health endpoint
 - Docker Compose skeleton
 - Test coverage
@@ -48,6 +49,7 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/fetch <url>` - fetch and display a web page
 - `/links <url>` - extract links from a web page
 - `/html <url>` - save and send page HTML
+- `/download <url>` - download and send a direct file URL
 - `/access` - show access settings (admins only)
 
 ## Access Control
@@ -59,9 +61,9 @@ ADMIN_TELEGRAM_IDS=123456789
 ALLOWED_TELEGRAM_IDS=123456789,987654321
 ```
 
-`/start`, `/help`, and `/whoami` are public. `/fetch`, `/links`, and `/html` require an admin or allowed user. `/access` is admin-only. If `ALLOWED_TELEGRAM_IDS` is empty, only admins can use protected commands.
+`/start`, `/help`, and `/whoami` are public. `/fetch`, `/links`, `/html`, and `/download` require an admin or allowed user. `/access` is admin-only. If `ALLOWED_TELEGRAM_IDS` is empty, only admins can use protected commands.
 
-Access is configured through environment variables in v0.2; database-based user management is not implemented yet.
+Access is configured through environment variables in v0.3; database-based user management is not implemented yet.
 
 ## Storage Limits
 
@@ -71,7 +73,14 @@ HTML exports are stored under `DOWNLOADS_DIR/html` before being sent. Files larg
 MAX_HTML_SIZE_MB=5
 DOWNLOADS_DIR=downloads
 MIN_FREE_DISK_MB=512
+MAX_DOWNLOAD_SIZE_MB=50
+TELEGRAM_MAX_UPLOAD_SIZE_MB=50
+MAX_DOWNLOADS_PER_USER_PER_DAY=10
 ```
+
+Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
+
+v0.3 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
 
 ## Tests
 
@@ -82,7 +91,7 @@ python -m pytest
 ## Troubleshooting
 
 - Some sites block automated requests and return HTTP 403.
-- Some sites require JavaScript rendering, which is not supported in v0.2.
+- Some sites require JavaScript rendering, which is not supported in v0.3.
 - Some content requires login or an existing session, which is not supported yet.
 - VPN, proxy, firewall, DNS, or other network restrictions can cause connection errors.
 
@@ -95,12 +104,7 @@ docker compose up --build
 
 ## Planned Features
 
-- HTML export as `.html` or `.html.gz`
-- File download with storage-aware limits
-- Admin-only access control
-- User allowlist
-- Per-user rate limits
-- Server disk-space detection
+- Scraping pages for download links
 - Docker deployment
 - Future support for Cloudflare Worker / Pages compatibility
 - Playwright-based screenshots and PDF export
@@ -108,5 +112,5 @@ docker compose up --build
 
 ## Project Status
 
-This project is in early development. It is currently suitable for local testing and controlled usage only. Public deployment requires rate limiting, access control, storage limits, and stronger abuse protection.
+This project is in early development. It is currently suitable for local testing and controlled usage only. Public deployment still requires persistent quotas and stronger abuse protection.
 

@@ -14,4 +14,4 @@ def has_minimum_free_space(directory: Path, minimum_free_mb: int) -> bool:
 
 def ensure_free_space(directory: Path, minimum_free_mb: int) -> None:
     if not has_minimum_free_space(directory, minimum_free_mb):
-        raise StorageError("Not enough free disk space to save this HTML file")
+        raise StorageError("Not enough free disk space to save this file")

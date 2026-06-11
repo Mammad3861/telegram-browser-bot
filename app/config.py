@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     max_html_size_mb: int = 5
     downloads_dir: str = "downloads"
     min_free_disk_mb: int = 512
+    max_download_size_mb: int = 50
+    telegram_max_upload_size_mb: int = 50
+    max_downloads_per_user_per_day: int = 10
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
