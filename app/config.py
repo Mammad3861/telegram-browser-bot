@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     pdf_format: str = "A4"
     pdf_print_background: bool = True
     rendered_html_wait_until: str = "domcontentloaded"
+    cookie_encryption_key: str = ""
+    session_storage_dir: str = "downloads/sessions"
+    enable_cookie_import: bool = True
+    max_cookie_import_size_kb: int = 256
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

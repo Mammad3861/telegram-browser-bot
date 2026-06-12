@@ -2,15 +2,15 @@
 
 > Early development / MVP. This project is currently experimental and not ready for public production use.
 
-A Telegram bot for fetching web pages, extracting links, exporting raw or browser-rendered HTML and PDF files, safely downloading direct files, and capturing full-page screenshots.
+A Telegram bot for fetching web pages, extracting links, exporting browser artifacts, downloading direct files, and using encrypted per-user browser sessions.
 
 ## Version
 
-v0.7.0
+v0.8.0
 
 ## Features
 
-- Telegram bot commands: `/start`, `/help`, `/whoami`, `/access`, `/fetch`, `/links`, `/html`, `/html_rendered`, `/download`, `/screenshot`, `/pdf`, `/status`, `/jobs`, `/cancel`
+- Telegram bot commands include browser exports, downloads, jobs, and encrypted cookie session management.
 - Secure URL validation
 - Basic SSRF protection
 - Public/private Telegram command access control
@@ -23,6 +23,7 @@ v0.7.0
 - In-memory background jobs with global and per-user concurrency limits
 - Playwright Chromium full-page PNG screenshots
 - Playwright Chromium PDF export with background graphics
+- Encrypted per-user, per-domain Playwright cookie sessions
 - Disk-space checks before saving HTML, downloads, screenshots, and PDFs
 - FastAPI health endpoint
 - Docker Compose skeleton
@@ -61,6 +62,10 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/download <url>` - download and send a direct file URL
 - `/screenshot <url>` - capture and send a full-page PNG screenshot
 - `/pdf <url>` - export and send a page as PDF
+- `/cookies_help` - show the accepted cookie import flow
+- `/cookies_import <domain>` - import a Playwright-compatible JSON cookie list
+- `/sessions` - list your saved session domains
+- `/delete_session <domain>` - delete one of your sessions
 - `/status <job_id>` - show progress and result for a job
 - `/jobs` - list recent jobs (admins see all jobs)
 - `/cancel <job_id>` - cancel an active job
@@ -75,9 +80,9 @@ ADMIN_TELEGRAM_IDS=123456789
 ALLOWED_TELEGRAM_IDS=123456789,987654321
 ```
 
-`/start`, `/help`, and `/whoami` are public. `/fetch`, `/links`, `/html`, `/html_rendered`, `/rendered_html`, `/download`, `/screenshot`, `/pdf`, `/status`, `/jobs`, and `/cancel` require an admin or allowed user. `/access` is admin-only. If `ALLOWED_TELEGRAM_IDS` is empty, only admins can use protected commands.
+`/start`, `/help`, and `/whoami` are public. Browser, download, job, and cookie/session commands require an admin or allowed user. `/access` is admin-only. Admins can manage only their own cookie sessions in v0.8.
 
-Access is configured through environment variables in v0.7; database-based user management is not implemented yet.
+Access is configured through environment variables in v0.8; database-based user management is not implemented yet.
 
 ## Storage Limits
 
@@ -100,17 +105,46 @@ MAX_PDF_SIZE_MB=30
 PDF_FORMAT=A4
 PDF_PRINT_BACKGROUND=true
 RENDERED_HTML_WAIT_UNTIL=domcontentloaded
+COOKIE_ENCRYPTION_KEY=
+SESSION_STORAGE_DIR=downloads/sessions
+ENABLE_COOKIE_IMPORT=true
+MAX_COOKIE_IMPORT_SIZE_KB=256
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
 
-v0.4 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
+v0.8 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
 
 ## Background Jobs
 
 `/html`, `/html_rendered`, `/download`, `/screenshot`, and `/pdf` run as background jobs. The bot immediately returns a short job ID, and `/status`, `/jobs`, and `/cancel` can be used to manage the work. Users can only view and cancel their own jobs; admins can manage any job.
 
-Jobs are stored in memory in v0.7 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
+Jobs are stored in memory in v0.8 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
+
+## Cookie Sessions
+
+Generate a Fernet key and place it in `.env` as `COOKIE_ENCRYPTION_KEY`:
+
+```powershell
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+The key is never generated or persisted automatically. Cookie import is unavailable when the key is missing or when `ENABLE_COOKIE_IMPORT=false`.
+
+Run `/cookies_import example.com`, then send a JSON list in Playwright cookie format:
+
+```json
+[
+  {
+    "name": "session",
+    "value": "cookie-value",
+    "domain": ".example.com",
+    "path": "/"
+  }
+]
+```
+
+Never import cookies from an untrusted source. Cookie values are not echoed by the bot and are stored in encrypted local files under `SESSION_STORAGE_DIR/<user_id>/`. Sessions are isolated by Telegram user and domain, and are used only by `/html_rendered`, `/screenshot`, and `/pdf`. HTTPX commands do not use saved cookies.
 
 ## HTML Modes
 
@@ -145,14 +179,14 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.7 does not automate that setup.
+The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.8 does not automate that setup.
 
 ## Planned Features
 
 - Scraping pages for download links
 - Docker deployment
 - Future support for Cloudflare Worker / Pages compatibility
-- Login and cookie support
+- Persistent database-backed sessions
 
 
 ## Project Status

@@ -13,6 +13,7 @@ from playwright.async_api import async_playwright
 
 from app.core.storage import ensure_free_space
 from app.core.url_validation import URLValidationError, validate_url
+from app.fetchers.browser_context import create_isolated_context
 
 
 class PdfError(RuntimeError):
@@ -38,6 +39,7 @@ class PdfOptions:
     print_background: bool = True
     max_size_mb: int = 30
     minimum_free_mb: int = 512
+    cookies: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -90,7 +92,8 @@ async def export_pdf(url: str, output_dir: Path, options: PdfOptions) -> PdfResu
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(headless=True)
             try:
-                page = await browser.new_page()
+                context = await create_isolated_context(browser, options.cookies)
+                page = await context.new_page()
 
                 async def validate_route(route) -> None:
                     try:

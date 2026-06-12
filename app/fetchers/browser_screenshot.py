@@ -13,6 +13,7 @@ from playwright.async_api import async_playwright
 
 from app.core.storage import ensure_free_space
 from app.core.url_validation import URLValidationError, validate_url
+from app.fetchers.browser_context import create_isolated_context
 
 
 class ScreenshotError(RuntimeError):
@@ -38,6 +39,7 @@ class ScreenshotOptions:
     viewport_height: int = 768
     max_size_mb: int = 20
     minimum_free_mb: int = 512
+    cookies: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -94,12 +96,15 @@ async def capture_screenshot(
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(headless=True)
             try:
-                page = await browser.new_page(
-                    viewport={
+                context = await create_isolated_context(
+                    browser,
+                    options.cookies,
+                    {
                         "width": options.viewport_width,
                         "height": options.viewport_height,
-                    }
+                    },
                 )
+                page = await context.new_page()
 
                 async def validate_route(route) -> None:
                     try:

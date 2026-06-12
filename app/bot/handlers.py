@@ -1,5 +1,7 @@
 import asyncio
+import json
 from pathlib import Path
+from urllib.parse import urlparse
 
 from aiogram import Router
 from aiogram.exceptions import TelegramAPIError
@@ -9,7 +11,15 @@ from aiogram.types import FSInputFile, Message
 from app.config import get_settings, parse_telegram_ids
 from app.core.access_control import is_admin, is_allowed_user
 from app.core.download_quota import download_quota
+from app.core.cookies import CookieValidationError, normalize_domain, validate_cookies_json
+from app.core.encryption import EncryptionError
 from app.core.jobs import Job, JobLimitError, job_store
+from app.core.session_store import (
+    delete_session,
+    list_sessions,
+    load_cookies_for_domain,
+    save_cookies,
+)
 from app.core.storage import StorageError
 from app.core.url_validation import URLValidationError, validate_url
 from app.fetchers.http_fetcher import FetchError, HttpFetcher
@@ -51,6 +61,10 @@ HELP_TEXT = (
     "/download <url> - download a direct file link\n"
     "/screenshot <url> - capture a full-page PNG\n"
     "/pdf <url> - export a page as PDF\n"
+    "/cookies_help - show cookie import help\n"
+    "/cookies_import <domain> - import cookies\n"
+    "/sessions - list your saved sessions\n"
+    "/delete_session <domain> - delete a saved session\n"
     "/status <job_id> - show job status\n"
     "/jobs - list recent jobs\n"
     "/cancel <job_id> - cancel an active job\n"
@@ -59,6 +73,7 @@ HELP_TEXT = (
 )
 
 ACCESS_DENIED = "Access denied. Ask the bot owner for access."
+pending_cookie_imports: dict[int, str] = {}
 
 
 def get_user_id(message: Message) -> int | None:
@@ -101,6 +116,79 @@ async def access_handler(message: Message) -> None:
     allowed_text = ", ".join(map(str, allowed)) if allowed else "admins only"
     await message.answer(
         f"Admins: {', '.join(map(str, admins)) or 'none'}\nAllowed users: {allowed_text}"
+    )
+
+
+@router.message(Command("cookies_help"))
+async def cookies_help_handler(message: Message) -> None:
+    if await reject_unless_allowed(message):
+        return
+    await message.answer(
+        "Use /cookies_import <domain>, then send a Playwright-compatible JSON list. "
+        "Each cookie requires name, value, and domain. Cookie values are never echoed."
+    )
+
+
+@router.message(Command("cookies_import"))
+async def cookies_import_handler(message: Message, command: CommandObject) -> None:
+    if await reject_unless_allowed(message):
+        return
+    settings = get_settings()
+    if not settings.enable_cookie_import:
+        await message.answer("Cookie import is disabled.")
+        return
+    if not settings.cookie_encryption_key:
+        await message.answer(
+            "Cookie encryption key is not configured. Ask the bot owner to configure it."
+        )
+        return
+    if not command.args:
+        await message.answer("Usage: /cookies_import <domain>")
+        return
+    try:
+        domain = normalize_domain(command.args.strip())
+    except CookieValidationError as exc:
+        await message.answer(f"Error: {exc}")
+        return
+    user_id = get_user_id(message)
+    if user_id is None:
+        await message.answer("Unable to identify the requesting user.")
+        return
+    pending_cookie_imports[user_id] = domain
+    await message.answer(
+        f"Send the JSON cookie list for {domain} in your next message."
+    )
+
+
+@router.message(Command("sessions"))
+async def sessions_handler(message: Message) -> None:
+    if await reject_unless_allowed(message):
+        return
+    user_id = get_user_id(message)
+    sessions = list_sessions(user_id) if user_id is not None else []
+    await message.answer(
+        "Saved sessions:\n" + "\n".join(sessions)
+        if sessions
+        else "No saved sessions."
+    )
+
+
+@router.message(Command("delete_session"))
+async def delete_session_handler(message: Message, command: CommandObject) -> None:
+    if await reject_unless_allowed(message):
+        return
+    if not command.args:
+        await message.answer("Usage: /delete_session <domain>")
+        return
+    user_id = get_user_id(message)
+    try:
+        domain = normalize_domain(command.args.strip())
+        deleted = user_id is not None and delete_session(user_id, domain)
+    except CookieValidationError as exc:
+        await message.answer(f"Error: {exc}")
+        return
+    await message.answer(
+        f"Session deleted for {domain}" if deleted else "Session not found."
     )
 
 
@@ -175,6 +263,13 @@ def create_background_job(message: Message, command: str, url: str) -> Job:
     )
 
 
+def browser_cookies_for_job(job: Job) -> tuple[dict, ...]:
+    hostname = urlparse(job.url).hostname
+    if not hostname:
+        return ()
+    return tuple(load_cookies_for_domain(job.user_id, hostname))
+
+
 async def run_html_job(job: Job, message: Message) -> None:
     settings = get_settings()
     job_store.update_job(job.id, status="running", progress=10)
@@ -225,15 +320,16 @@ async def rendered_html_handler(message: Message, command: CommandObject) -> Non
 async def run_rendered_html_job(job: Job, message: Message) -> None:
     settings = get_settings()
     job_store.update_job(job.id, status="running", progress=10)
-    options = RenderedHtmlOptions(
-        timeout_seconds=settings.browser_timeout_seconds,
-        max_html_size_mb=settings.max_html_size_mb,
-        wait_until=settings.rendered_html_wait_until,
-        viewport_width=settings.screenshot_viewport_width,
-        viewport_height=settings.screenshot_viewport_height,
-        minimum_free_mb=settings.min_free_disk_mb,
-    )
     try:
+        options = RenderedHtmlOptions(
+            timeout_seconds=settings.browser_timeout_seconds,
+            max_html_size_mb=settings.max_html_size_mb,
+            wait_until=settings.rendered_html_wait_until,
+            viewport_width=settings.screenshot_viewport_width,
+            viewport_height=settings.screenshot_viewport_height,
+            minimum_free_mb=settings.min_free_disk_mb,
+            cookies=browser_cookies_for_job(job),
+        )
         result = await export_rendered_html(
             job.url, Path(settings.downloads_dir), options
         )
@@ -262,6 +358,7 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
         RenderedHtmlBrowserNotInstalledError,
         RenderedHtmlTimeoutError,
         RenderedHtmlError,
+        EncryptionError,
         StorageError,
         OSError,
         TelegramAPIError,
@@ -373,14 +470,15 @@ async def screenshot_handler(message: Message, command: CommandObject) -> None:
 async def run_screenshot_job(job: Job, message: Message) -> None:
     settings = get_settings()
     job_store.update_job(job.id, status="running", progress=10)
-    options = ScreenshotOptions(
-        timeout_seconds=settings.browser_timeout_seconds,
-        viewport_width=settings.screenshot_viewport_width,
-        viewport_height=settings.screenshot_viewport_height,
-        max_size_mb=settings.max_screenshot_size_mb,
-        minimum_free_mb=settings.min_free_disk_mb,
-    )
     try:
+        options = ScreenshotOptions(
+            timeout_seconds=settings.browser_timeout_seconds,
+            viewport_width=settings.screenshot_viewport_width,
+            viewport_height=settings.screenshot_viewport_height,
+            max_size_mb=settings.max_screenshot_size_mb,
+            minimum_free_mb=settings.min_free_disk_mb,
+            cookies=browser_cookies_for_job(job),
+        )
         result = await capture_screenshot(
             job.url, Path(settings.downloads_dir), options
         )
@@ -409,6 +507,7 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
         ScreenshotTimeoutError,
         ScreenshotTooLargeError,
         ScreenshotError,
+        EncryptionError,
         StorageError,
         OSError,
         TelegramAPIError,
@@ -439,14 +538,15 @@ async def pdf_handler(message: Message, command: CommandObject) -> None:
 async def run_pdf_job(job: Job, message: Message) -> None:
     settings = get_settings()
     job_store.update_job(job.id, status="running", progress=10)
-    options = PdfOptions(
-        timeout_seconds=settings.browser_timeout_seconds,
-        format=settings.pdf_format,
-        print_background=settings.pdf_print_background,
-        max_size_mb=settings.max_pdf_size_mb,
-        minimum_free_mb=settings.min_free_disk_mb,
-    )
     try:
+        options = PdfOptions(
+            timeout_seconds=settings.browser_timeout_seconds,
+            format=settings.pdf_format,
+            print_background=settings.pdf_print_background,
+            max_size_mb=settings.max_pdf_size_mb,
+            minimum_free_mb=settings.min_free_disk_mb,
+            cookies=browser_cookies_for_job(job),
+        )
         result = await export_pdf(job.url, Path(settings.downloads_dir), options)
         job_store.update_job(job.id, progress=90)
         await message.answer_document(
@@ -473,6 +573,7 @@ async def run_pdf_job(job: Job, message: Message) -> None:
         PdfTimeoutError,
         PdfTooLargeError,
         PdfError,
+        EncryptionError,
         StorageError,
         OSError,
         TelegramAPIError,
@@ -545,3 +646,38 @@ async def cancel_handler(message: Message, command: CommandObject) -> None:
         await message.answer("Job not found, not active, or not owned by you.")
         return
     await message.answer(f"Job {command.args.strip()} cancelled.")
+
+
+@router.message()
+async def pending_cookie_import_handler(message: Message) -> None:
+    user_id = get_user_id(message)
+    if user_id is None or user_id not in pending_cookie_imports or not message.text:
+        return
+    if not is_allowed_user(user_id):
+        pending_cookie_imports.pop(user_id, None)
+        await message.answer(ACCESS_DENIED)
+        return
+
+    settings = get_settings()
+    domain = pending_cookie_imports[user_id]
+    if not settings.enable_cookie_import:
+        pending_cookie_imports.pop(user_id, None)
+        await message.answer("Cookie import is disabled.")
+        return
+    if not settings.cookie_encryption_key:
+        pending_cookie_imports.pop(user_id, None)
+        await message.answer(
+            "Cookie encryption key is not configured. Ask the bot owner to configure it."
+        )
+        return
+    try:
+        cookies = validate_cookies_json(
+            message.text, domain, settings.max_cookie_import_size_kb
+        )
+        save_cookies(user_id, domain, json.dumps(cookies, separators=(",", ":")))
+    except (CookieValidationError, EncryptionError, OSError) as exc:
+        await message.answer(f"Error: {exc}")
+        return
+
+    pending_cookie_imports.pop(user_id, None)
+    await message.answer(f"Cookies saved for {domain}")

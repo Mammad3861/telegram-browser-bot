@@ -4,13 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "telegram-browser-bot"
-version = "0.7.0"
-description = "A Telegram bot for fetching pages and safely downloading direct files."
+version = "0.8.0"
+description = "A Telegram browser bot with encrypted per-user cookie sessions."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiogram>=3.13,<4",
     "beautifulsoup4>=4.12,<5",
+    "cryptography>=44,<46",
     "fastapi>=0.115,<1",
     "httpx>=0.27,<1",
     "pydantic-settings>=2.5,<3",
