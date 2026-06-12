@@ -18,6 +18,7 @@ from app.core.access_store import (
 from app.core.download_quota import download_quota
 from app.core.cookies import CookieValidationError, normalize_domain, validate_cookies_json
 from app.core.command_args import CommandArgumentError, parse_single_url_arg, url_usage
+from app.core.cleanup import cleanup_generated_files
 from app.core.encryption import EncryptionError
 from app.core.jobs import Job, JobLimitError, job_store
 from app.core.session_store import (
@@ -26,6 +27,7 @@ from app.core.session_store import (
     load_cookies_for_domain,
     save_cookies,
 )
+from app.core.runtime_status import build_admin_status
 from app.core.storage import StorageError
 from app.core.url_validation import URLValidationError, validate_url
 from app.fetchers.http_fetcher import FetchError, HttpFetcher, safe_response_text
@@ -76,6 +78,8 @@ HELP_TEXT = (
     "/allow <telegram_id> [note] - grant runtime access\n"
     "/deny <telegram_id> - revoke runtime access\n"
     "/allowed_users - list configured users\n"
+    "/admin_status - show runtime status\n"
+    "/cleanup - delete old generated files\n"
     "/status <job_id> - show job status\n"
     "/jobs - list recent jobs\n"
     "/cancel <job_id> - cancel an active job\n"
@@ -217,6 +221,49 @@ async def allowed_users_handler(message: Message) -> None:
     ) or "none"
     await message.answer(
         f"Static allowed users: {static_text}\nRuntime allowed users:\n{runtime_text}"
+    )
+
+
+@router.message(Command("admin_status"))
+async def admin_status_handler(message: Message) -> None:
+    user_id = get_user_id(message)
+    if user_id is None or not is_admin(user_id):
+        await message.answer(ADMIN_REQUIRED)
+        return
+    status = build_admin_status(get_settings(), job_store)
+    directories = ", ".join(
+        f"{name}={'ready' if exists else 'missing'}"
+        for name, exists in status.generated_directories.items()
+    )
+    await message.answer(
+        f"Version: {status.version}\n"
+        f"Runtime target: {status.runtime_target}\n"
+        f"Active jobs: {status.active_jobs}\n"
+        f"Known jobs: {status.known_jobs}\n"
+        f"Runtime allowed users: {status.runtime_allowed_users}\n"
+        f"Storage free: {status.storage_free_bytes} bytes\n"
+        f"Cookie import: {'enabled' if status.cookie_import_enabled else 'disabled'}\n"
+        f"Generated directories: {directories}"
+    )
+
+
+@router.message(Command("cleanup"))
+async def cleanup_handler(message: Message) -> None:
+    user_id = get_user_id(message)
+    if user_id is None or not is_admin(user_id):
+        await message.answer(ADMIN_REQUIRED)
+        return
+    settings = get_settings()
+    try:
+        result = cleanup_generated_files(
+            Path(settings.downloads_dir), settings.cleanup_max_age_hours
+        )
+    except OSError:
+        await message.answer("Cleanup failed because generated files could not be removed.")
+        return
+    await message.answer(
+        f"Cleanup complete.\nDeleted files: {result.deleted_files}\n"
+        f"Freed bytes: {result.freed_bytes}"
     )
 
 

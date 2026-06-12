@@ -1,12 +1,12 @@
 # Telegram Browser Bot
 
-> Early development / MVP. This project is currently experimental and not ready for public production use.
+> v1.0 alpha. This project is ready for controlled early testing, not unrestricted public deployment.
 
 A Telegram bot for fetching web pages, extracting links, exporting browser artifacts, downloading direct files, and using encrypted per-user browser sessions.
 
 ## Version
 
-v0.9.2
+v1.0.0-alpha.1
 
 ## Features
 
@@ -27,7 +27,7 @@ v0.9.2
 - Persistent local runtime allowlist managed by bot administrators
 - Disk-space checks before saving HTML, downloads, screenshots, and PDFs
 - FastAPI health endpoint
-- Docker Compose skeleton
+- Docker-first Ubuntu 24.04 deployment
 - Test coverage
 
 ## Target Runtime
@@ -92,6 +92,8 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/allow <telegram_id> [note]` - grant runtime access (admin only)
 - `/deny <telegram_id>` - revoke runtime access (admin only)
 - `/allowed_users` - list static and runtime allowed users (admin only)
+- `/admin_status` - show safe application and storage diagnostics (admin only)
+- `/cleanup` - delete generated files older than the configured retention period (admin only)
 - `/status <job_id>` - show progress and result for a job
 - `/jobs` - list recent jobs (admins see all jobs)
 - `/cancel <job_id>` - cancel an active job
@@ -117,6 +119,7 @@ Static allowed users come from `ALLOWED_TELEGRAM_IDS`. Runtime users are stored 
 ```env
 ACCESS_STORAGE_PATH=downloads/access/allowed_users.json
 ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
+CLEANUP_MAX_AGE_HOURS=24
 ```
 
 Set `ENABLE_RUNTIME_ACCESS_MANAGEMENT=false` to disable `/allow`, `/deny`, and `/allowed_users`. Existing administrators cannot be removed with `/deny`. The `downloads/access` directory may contain real Telegram user IDs and must not be committed; the project ignores the entire `downloads/` directory.
@@ -148,11 +151,14 @@ ENABLE_COOKIE_IMPORT=true
 MAX_COOKIE_IMPORT_SIZE_KB=256
 ACCESS_STORAGE_PATH=downloads/access/allowed_users.json
 ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
+CLEANUP_MAX_AGE_HOURS=24
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
 
-v0.9.2 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
+Direct downloads support direct file URLs only. They do not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
+
+`/cleanup` removes files older than `CLEANUP_MAX_AGE_HOURS` only from `html`, `html_rendered`, `files`, `screenshots`, and `pdf`. It never removes runtime access data or encrypted sessions.
 
 ## Background Jobs
 
@@ -192,7 +198,7 @@ Never import cookies from an untrusted source. Cookie values are not echoed by t
 
 Rendered HTML requires Chromium:
 
-```powershell
+```bash
 python -m playwright install chromium
 ```
 
@@ -208,30 +214,59 @@ python -m pytest
 - Some sites block or challenge headless browsers. This project does not bypass CAPTCHAs or anti-bot systems.
 - JavaScript-heavy sites may work better with `/html_rendered` or `/screenshot` than `/fetch` or `/html`.
 - PDF export may not preserve every animation, lazy-loaded element, or other dynamic page feature perfectly.
-- Some content requires login or an existing session, which is not supported yet.
+- Some content requires login or an existing session. Encrypted imported cookies can support compatible browser sessions, but interactive login is not implemented.
 - VPN, proxy, firewall, DNS, or other network restrictions can cause connection errors.
 - If HTTP decoding fails, try `/html_rendered`, `/screenshot`, or the supported Linux/Docker environment.
 - Windows local browser automation is best-effort. If browser jobs fail with asyncio subprocess errors, test on Ubuntu or Docker.
 
-## Docker
+## Docker Compose Deployment
 
-```powershell
-Copy-Item .env.example .env
-docker compose up --build
+Docker Compose on Ubuntu 24.04 is the preferred deployment path. The image installs Python 3.12 dependencies, Playwright system packages, and Chromium during the build. Browser installation never happens at application runtime.
+
+Create the environment file and configure at least `TELEGRAM_BOT_TOKEN` and `ADMIN_TELEGRAM_IDS`:
+
+```bash
+cp .env.example .env
 ```
 
-The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.9.2 does not automate that setup.
+Generate a Fernet key for encrypted cookie sessions, then place the output in `.env` as `COOKIE_ENCRYPTION_KEY`:
 
-## Planned Features
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
 
-- Scraping pages for download links
-- Docker deployment
-- Future support for Cloudflare Worker / Pages compatibility
-- Persistent database-backed sessions
-- Database-backed access management
+Prepare the persistent bind mount for the non-root container user and start the service:
+
+```bash
+mkdir -p downloads
+sudo chown -R 10001:10001 downloads
+docker compose up -d --build
+```
+
+Follow logs, test health, and stop the service:
+
+```bash
+docker compose logs -f
+curl http://127.0.0.1:18080/health
+docker compose down
+```
+
+The `./downloads:/app/downloads` mount persists generated files, runtime access data, and encrypted sessions across container replacement. Do not commit this directory.
+
+Telegram polling makes outbound connections, so ports 80 and 443 do not need to be exposed. Port `8000` is published as `127.0.0.1:18080` only for local health checks. If `TELEGRAM_BOT_TOKEN` is missing, the API and health endpoint still start while polling remains disabled. If `COOKIE_ENCRYPTION_KEY` is missing, cookie import is disabled while other features continue to work.
+
+## Post-v1 Roadmap
+
+- Interactive Telegram menu with inline buttons
+- URL session cards
+- Per-session action buttons: Screenshot, PDF, HTML, Rendered HTML, Links, Download, Refresh, Cancel
+- Persian language support
+- Admin-editable bot texts, descriptions, and help messages
+- Better UX with modern Telegram-style messages
+- Optional per-user language preference
 
 
 ## Project Status
 
-This project is in early development. It is currently suitable for local testing and controlled usage only. Public deployment still requires persistent quotas and stronger abuse protection.
+This project is in alpha and suitable for controlled early testing on Ubuntu 24.04 or Docker Compose. Public deployment still requires persistent jobs and quotas, stronger abuse protection, and broader operational testing.
 
