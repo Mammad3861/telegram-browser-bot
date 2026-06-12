@@ -6,7 +6,7 @@ A Telegram bot for fetching web pages, extracting links, exporting browser artif
 
 ## Version
 
-v0.8.0
+v0.9.0
 
 ## Features
 
@@ -24,6 +24,7 @@ v0.8.0
 - Playwright Chromium full-page PNG screenshots
 - Playwright Chromium PDF export with background graphics
 - Encrypted per-user, per-domain Playwright cookie sessions
+- Persistent local runtime allowlist managed by bot administrators
 - Disk-space checks before saving HTML, downloads, screenshots, and PDFs
 - FastAPI health endpoint
 - Docker Compose skeleton
@@ -66,6 +67,9 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/cookies_import <domain>` - import a Playwright-compatible JSON cookie list
 - `/sessions` - list your saved session domains
 - `/delete_session <domain>` - delete one of your sessions
+- `/allow <telegram_id> [note]` - grant runtime access (admin only)
+- `/deny <telegram_id>` - revoke runtime access (admin only)
+- `/allowed_users` - list static and runtime allowed users (admin only)
 - `/status <job_id>` - show progress and result for a job
 - `/jobs` - list recent jobs (admins see all jobs)
 - `/cancel <job_id>` - cancel an active job
@@ -80,9 +84,20 @@ ADMIN_TELEGRAM_IDS=123456789
 ALLOWED_TELEGRAM_IDS=123456789,987654321
 ```
 
-`/start`, `/help`, and `/whoami` are public. Browser, download, job, and cookie/session commands require an admin or allowed user. `/access` is admin-only. Admins can manage only their own cookie sessions in v0.8.
+`/start`, `/help`, and `/whoami` are public. Browser, download, job, and cookie/session commands require an admin or allowed user. `/allow`, `/deny`, `/allowed_users`, and `/access` are admin-only. Admins always retain access.
 
-Access is configured through environment variables in v0.8; database-based user management is not implemented yet.
+Static access is configured through environment variables. Runtime access changes are persisted locally without restarting the bot.
+
+## Runtime Access
+
+Static allowed users come from `ALLOWED_TELEGRAM_IDS`. Runtime users are stored in `ACCESS_STORAGE_PATH`, which defaults to `downloads/access/allowed_users.json`. Both sources are combined by access checks; if both are empty, only admins may use protected commands.
+
+```env
+ACCESS_STORAGE_PATH=downloads/access/allowed_users.json
+ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
+```
+
+Set `ENABLE_RUNTIME_ACCESS_MANAGEMENT=false` to disable `/allow`, `/deny`, and `/allowed_users`. Existing administrators cannot be removed with `/deny`. The `downloads/access` directory may contain real Telegram user IDs and must not be committed; the project ignores the entire `downloads/` directory.
 
 ## Storage Limits
 
@@ -109,17 +124,19 @@ COOKIE_ENCRYPTION_KEY=
 SESSION_STORAGE_DIR=downloads/sessions
 ENABLE_COOKIE_IMPORT=true
 MAX_COOKIE_IMPORT_SIZE_KB=256
+ACCESS_STORAGE_PATH=downloads/access/allowed_users.json
+ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
 
-v0.8 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
+v0.9 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
 
 ## Background Jobs
 
 `/html`, `/html_rendered`, `/download`, `/screenshot`, and `/pdf` run as background jobs. The bot immediately returns a short job ID, and `/status`, `/jobs`, and `/cancel` can be used to manage the work. Users can only view and cancel their own jobs; admins can manage any job.
 
-Jobs are stored in memory in v0.8 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
+Jobs are stored in memory in v0.9 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
 
 ## Cookie Sessions
 
@@ -179,7 +196,7 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.8 does not automate that setup.
+The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.9 does not automate that setup.
 
 ## Planned Features
 
@@ -187,6 +204,7 @@ The current `python:3.12-slim` Compose image does not include Chromium or Playwr
 - Docker deployment
 - Future support for Cloudflare Worker / Pages compatibility
 - Persistent database-backed sessions
+- Database-backed access management
 
 
 ## Project Status

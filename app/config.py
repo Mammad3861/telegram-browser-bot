@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     session_storage_dir: str = "downloads/sessions"
     enable_cookie_import: bool = True
     max_cookie_import_size_kb: int = 256
+    access_storage_path: str = "downloads/access/allowed_users.json"
+    enable_runtime_access_management: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

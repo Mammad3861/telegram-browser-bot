@@ -9,7 +9,11 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import FSInputFile, Message
 
 from app.config import get_settings, parse_telegram_ids
-from app.core.access_control import is_admin, is_allowed_user
+from app.core.access_control import deny_runtime_user, is_admin, is_allowed_user
+from app.core.access_store import (
+    add_allowed_user,
+    list_allowed_users,
+)
 from app.core.download_quota import download_quota
 from app.core.cookies import CookieValidationError, normalize_domain, validate_cookies_json
 from app.core.encryption import EncryptionError
@@ -65,6 +69,9 @@ HELP_TEXT = (
     "/cookies_import <domain> - import cookies\n"
     "/sessions - list your saved sessions\n"
     "/delete_session <domain> - delete a saved session\n"
+    "/allow <telegram_id> [note] - grant runtime access\n"
+    "/deny <telegram_id> - revoke runtime access\n"
+    "/allowed_users - list configured users\n"
     "/status <job_id> - show job status\n"
     "/jobs - list recent jobs\n"
     "/cancel <job_id> - cancel an active job\n"
@@ -73,6 +80,7 @@ HELP_TEXT = (
 )
 
 ACCESS_DENIED = "Access denied. Ask the bot owner for access."
+ADMIN_REQUIRED = "Admin access required."
 pending_cookie_imports: dict[int, str] = {}
 
 
@@ -108,14 +116,103 @@ async def whoami_handler(message: Message) -> None:
 async def access_handler(message: Message) -> None:
     user_id = get_user_id(message)
     if user_id is None or not is_admin(user_id):
-        await message.answer(ACCESS_DENIED)
+        await message.answer(ADMIN_REQUIRED)
         return
     settings = get_settings()
-    admins = sorted(parse_telegram_ids(settings.admin_telegram_ids))
-    allowed = sorted(parse_telegram_ids(settings.allowed_telegram_ids))
-    allowed_text = ", ".join(map(str, allowed)) if allowed else "admins only"
+    static_allowed = parse_telegram_ids(settings.allowed_telegram_ids)
+    runtime_allowed = list_allowed_users(Path(settings.access_storage_path))
     await message.answer(
-        f"Admins: {', '.join(map(str, admins)) or 'none'}\nAllowed users: {allowed_text}"
+        f"Your Telegram ID: {user_id}\n"
+        f"Admin: yes\n"
+        f"Runtime access management: "
+        f"{'enabled' if settings.enable_runtime_access_management else 'disabled'}\n"
+        f"Static allowed users: {len(static_allowed)}\n"
+        f"Runtime allowed users: {len(runtime_allowed)}"
+    )
+
+
+def parse_access_target(arguments: str | None) -> tuple[int, str | None]:
+    if not arguments:
+        raise ValueError("Telegram ID is required")
+    parts = arguments.strip().split(maxsplit=1)
+    try:
+        telegram_id = int(parts[0])
+    except ValueError as exc:
+        raise ValueError("Telegram ID must be an integer") from exc
+    note = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
+    return telegram_id, note
+
+
+def runtime_access_path() -> Path:
+    return Path(get_settings().access_storage_path)
+
+
+async def require_runtime_admin(message: Message) -> int | None:
+    user_id = get_user_id(message)
+    if user_id is None or not is_admin(user_id):
+        await message.answer(ADMIN_REQUIRED)
+        return None
+    if not get_settings().enable_runtime_access_management:
+        await message.answer("Runtime access management is disabled.")
+        return None
+    return user_id
+
+
+@router.message(Command("allow"))
+async def allow_handler(message: Message, command: CommandObject) -> None:
+    admin_id = await require_runtime_admin(message)
+    if admin_id is None:
+        return
+    try:
+        telegram_id, note = parse_access_target(command.args)
+    except ValueError as exc:
+        await message.answer(f"Error: {exc}")
+        return
+    added = add_allowed_user(runtime_access_path(), telegram_id, admin_id, note)
+    await message.answer(
+        f"Access granted to {telegram_id}."
+        if added
+        else f"User {telegram_id} is already runtime-allowed."
+    )
+
+
+@router.message(Command("deny"))
+async def deny_handler(message: Message, command: CommandObject) -> None:
+    admin_id = await require_runtime_admin(message)
+    if admin_id is None:
+        return
+    try:
+        telegram_id, _ = parse_access_target(command.args)
+    except ValueError as exc:
+        await message.answer(f"Error: {exc}")
+        return
+    try:
+        removed = deny_runtime_user(runtime_access_path(), telegram_id)
+    except ValueError as exc:
+        await message.answer(f"{exc}.")
+        return
+    await message.answer(
+        f"Runtime access revoked for {telegram_id}."
+        if removed
+        else "Runtime allowed user not found."
+    )
+
+
+@router.message(Command("allowed_users"))
+async def allowed_users_handler(message: Message) -> None:
+    if await require_runtime_admin(message) is None:
+        return
+    settings = get_settings()
+    static_ids = sorted(parse_telegram_ids(settings.allowed_telegram_ids))
+    runtime_users = list_allowed_users(runtime_access_path())
+    static_text = ", ".join(map(str, static_ids)) if static_ids else "none"
+    runtime_text = "\n".join(
+        f"{user.telegram_id}"
+        + (f" - {user.note}" if user.note else "")
+        for user in runtime_users
+    ) or "none"
+    await message.answer(
+        f"Static allowed users: {static_text}\nRuntime allowed users:\n{runtime_text}"
     )
 
 

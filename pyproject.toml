@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "telegram-browser-bot"
-version = "0.8.0"
-description = "A Telegram browser bot with encrypted per-user cookie sessions."
+version = "0.9.0"
+description = "A Telegram browser bot with encrypted sessions and runtime access control."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
