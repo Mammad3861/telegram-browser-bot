@@ -17,6 +17,7 @@ from app.core.access_store import (
 )
 from app.core.download_quota import download_quota
 from app.core.cookies import CookieValidationError, normalize_domain, validate_cookies_json
+from app.core.command_args import CommandArgumentError, parse_single_url_arg, url_usage
 from app.core.encryption import EncryptionError
 from app.core.jobs import Job, JobLimitError, job_store
 from app.core.session_store import (
@@ -51,6 +52,7 @@ from app.fetchers.browser_html import (
     RenderedHtmlTimeoutError,
     export_rendered_html,
 )
+from app.fetchers.browser_diagnostics import map_browser_runtime_error
 from app.fetchers.file_downloader import DownloadError, FileDownloader
 from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
@@ -295,15 +297,14 @@ async def delete_session_handler(message: Message, command: CommandObject) -> No
 async def fetch_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /fetch <url>")
-        return
-
     try:
+        url = parse_single_url_arg(command.args)
         async with HttpFetcher() as fetcher:
-            response = await fetcher.fetch(command.args.strip())
+            response = await fetcher.fetch(url)
         body = safe_response_text(response)[:3500]
         await message.answer(f"Status: {response.status_code}\n\n{body}")
+    except CommandArgumentError:
+        await message.answer(url_usage("fetch"))
     except (URLValidationError, FetchError) as exc:
         await message.answer(f"Error: {exc}")
 
@@ -312,12 +313,8 @@ async def fetch_handler(message: Message, command: CommandObject) -> None:
 async def links_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /links <url>")
-        return
-
     try:
-        url = command.args.strip()
+        url = parse_single_url_arg(command.args)
         async with HttpFetcher() as fetcher:
             response = await fetcher.fetch(url)
         links = LinkExtractor.extract(safe_response_text(response), str(response.url))
@@ -326,6 +323,8 @@ async def links_handler(message: Message, command: CommandObject) -> None:
             return
         text = "\n".join(links[:50])
         await message.answer(text[:4000])
+    except CommandArgumentError:
+        await message.answer(url_usage("links"))
     except (URLValidationError, FetchError) as exc:
         await message.answer(f"Error: {exc}")
 
@@ -334,16 +333,14 @@ async def links_handler(message: Message, command: CommandObject) -> None:
 async def html_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /html <url>")
-        return
-
     try:
-        url = validate_url(command.args.strip())
+        url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "html", url)
         await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
         task = asyncio.create_task(run_html_job(job, message))
         job_store.register_task(job.id, task)
+    except CommandArgumentError:
+        await message.answer(url_usage("html"))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(f"Error: {exc}")
 
@@ -402,16 +399,14 @@ async def run_html_job(job: Job, message: Message) -> None:
 async def rendered_html_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /html_rendered <url>")
-        return
-
     try:
-        url = validate_url(command.args.strip())
+        url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "html_rendered", url)
         await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
         task = asyncio.create_task(run_rendered_html_job(job, message))
         job_store.register_task(job.id, task)
+    except CommandArgumentError:
+        await message.answer(url_usage("html_rendered"))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(f"Error: {exc}")
 
@@ -452,6 +447,10 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
+    except NotImplementedError as exc:
+        safe_message = map_browser_runtime_error(exc) or "Browser request failed"
+        log_safe_job_error(job, exc, safe_message)
+        await fail_job(job.id, message, safe_message)
     except (
         URLValidationError,
         RenderedHtmlBrowserNotInstalledError,
@@ -461,15 +460,15 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
         StorageError,
         OSError,
     ) as exc:
-        log_safe_job_error(exc, str(exc))
+        log_safe_job_error(job, exc, str(exc))
         await fail_job(job.id, message, str(exc))
     except TelegramAPIError as exc:
         safe_message = "Telegram could not send the rendered HTML file"
-        log_safe_job_error(exc, safe_message)
+        log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except Exception as exc:
-        safe_message = "Rendered HTML job failed unexpectedly"
-        log_safe_job_error(exc, safe_message)
+        safe_message = "Browser request failed"
+        log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
 
 
@@ -488,10 +487,6 @@ def format_download_info(
 async def download_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /download <url>")
-        return
-
     user_id = get_user_id(message)
     settings = get_settings()
     if user_id is None or download_quota.remaining(
@@ -501,12 +496,14 @@ async def download_handler(message: Message, command: CommandObject) -> None:
         return
 
     try:
-        url = validate_url(command.args.strip())
+        url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "download", url)
         download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
         await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
         task = asyncio.create_task(run_download_job(job, message))
         job_store.register_task(job.id, task)
+    except CommandArgumentError:
+        await message.answer(url_usage("download"))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(f"Error: {exc}")
 
@@ -558,16 +555,14 @@ async def run_download_job(job: Job, message: Message) -> None:
 async def screenshot_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /screenshot <url>")
-        return
-
     try:
-        url = validate_url(command.args.strip())
+        url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "screenshot", url)
         await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
         task = asyncio.create_task(run_screenshot_job(job, message))
         job_store.register_task(job.id, task)
+    except CommandArgumentError:
+        await message.answer(url_usage("screenshot"))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(f"Error: {exc}")
 
@@ -606,6 +601,10 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
+    except NotImplementedError as exc:
+        safe_message = map_browser_runtime_error(exc) or "Browser request failed"
+        log_safe_job_error(job, exc, safe_message)
+        await fail_job(job.id, message, safe_message)
     except (
         URLValidationError,
         BrowserNotInstalledError,
@@ -616,15 +615,15 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
         StorageError,
         OSError,
     ) as exc:
-        log_safe_job_error(exc, str(exc))
+        log_safe_job_error(job, exc, str(exc))
         await fail_job(job.id, message, str(exc))
     except TelegramAPIError as exc:
         safe_message = "Telegram could not send the screenshot file"
-        log_safe_job_error(exc, safe_message)
+        log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except Exception as exc:
-        safe_message = "Screenshot job failed unexpectedly"
-        log_safe_job_error(exc, safe_message)
+        safe_message = "Browser request failed"
+        log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
 
 
@@ -632,16 +631,14 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
 async def pdf_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /pdf <url>")
-        return
-
     try:
-        url = validate_url(command.args.strip())
+        url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "pdf", url)
         await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
         task = asyncio.create_task(run_pdf_job(job, message))
         job_store.register_task(job.id, task)
+    except CommandArgumentError:
+        await message.answer(url_usage("pdf"))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(f"Error: {exc}")
 
@@ -678,6 +675,10 @@ async def run_pdf_job(job: Job, message: Message) -> None:
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
+    except NotImplementedError as exc:
+        safe_message = map_browser_runtime_error(exc) or "Browser request failed"
+        log_safe_job_error(job, exc, safe_message)
+        await fail_job(job.id, message, safe_message)
     except (
         URLValidationError,
         PdfBrowserNotInstalledError,
@@ -688,15 +689,15 @@ async def run_pdf_job(job: Job, message: Message) -> None:
         StorageError,
         OSError,
     ) as exc:
-        log_safe_job_error(exc, str(exc))
+        log_safe_job_error(job, exc, str(exc))
         await fail_job(job.id, message, str(exc))
     except TelegramAPIError as exc:
         safe_message = "Telegram could not send the PDF file"
-        log_safe_job_error(exc, safe_message)
+        log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except Exception as exc:
-        safe_message = "PDF job failed unexpectedly"
-        log_safe_job_error(exc, safe_message)
+        safe_message = "Browser request failed"
+        log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
 
 
@@ -705,9 +706,11 @@ async def fail_job(job_id: str, message: Message, error: str) -> None:
     await message.answer(f"Job {job_id} failed: {error}")
 
 
-def log_safe_job_error(error: BaseException, safe_message: str) -> None:
+def log_safe_job_error(job: Job, error: BaseException, safe_message: str) -> None:
     logger.warning(
-        "Background job failed: exception_type=%s safe_message=%s",
+        "Background job failed: job_id=%s command=%s exception_type=%s safe_message=%s",
+        job.id,
+        job.command,
         type(error).__name__,
         safe_message,
     )

@@ -8,6 +8,7 @@ from app.fetchers.http_fetcher import (
     DEFAULT_HEADERS,
     FetchError,
     HttpFetcher,
+    INVALID_URL_MESSAGE,
     safe_response_text,
 )
 
@@ -103,3 +104,14 @@ def test_decoding_error_has_safe_suggestion() -> None:
 
     assert str(error.value) == DECODING_ERROR_MESSAGE
     assert "unsafe decoder detail" not in str(error.value)
+
+
+def test_invalid_url_has_safe_message() -> None:
+    async def handler(_: httpx.Request) -> httpx.Response:
+        raise httpx.InvalidURL("unsafe invalid URL detail")
+
+    with pytest.raises(FetchError) as error:
+        run_fetch(httpx.MockTransport(handler))
+
+    assert str(error.value) == INVALID_URL_MESSAGE
+    assert "unsafe invalid URL detail" not in str(error.value)

@@ -29,6 +29,7 @@ DECODING_ERROR_MESSAGE = (
     "HTTP request failed (DecodingError). Try /html_rendered, /screenshot, "
     "or run on the supported Linux/Docker environment."
 )
+INVALID_URL_MESSAGE = "Invalid URL. Please send a single valid http/https URL."
 
 
 def safe_response_text(response: httpx.Response) -> str:
@@ -108,6 +109,8 @@ class HttpFetcher:
                 )
         except httpx.DecodingError as exc:
             raise FetchError(DECODING_ERROR_MESSAGE) from exc
+        except httpx.InvalidURL as exc:
+            raise FetchError(INVALID_URL_MESSAGE) from exc
         except httpx.TimeoutException as exc:
             raise FetchError("The request timed out") from exc
         except httpx.ConnectError as exc:

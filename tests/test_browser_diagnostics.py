@@ -2,9 +2,11 @@ import logging
 
 from app.fetchers.browser_diagnostics import (
     BROWSER_INSTALL_MESSAGE,
+    BROWSER_RUNTIME_UNSUPPORTED_MESSAGE,
     generic_browser_message,
     is_browser_not_installed,
     log_safe_browser_error,
+    map_browser_runtime_error,
 )
 
 
@@ -35,3 +37,10 @@ def test_safe_browser_log_does_not_include_original_error(caplog) -> None:
     assert "RuntimeError" in caplog.text
     assert "Browser operation failed safely" in caplog.text
     assert "secret cookie value" not in caplog.text
+
+
+def test_not_implemented_maps_to_supported_runtime_message() -> None:
+    assert map_browser_runtime_error(NotImplementedError()) == (
+        BROWSER_RUNTIME_UNSUPPORTED_MESSAGE
+    )
+    assert "Linux/Docker" in BROWSER_RUNTIME_UNSUPPORTED_MESSAGE

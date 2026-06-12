@@ -6,7 +6,7 @@ A Telegram bot for fetching web pages, extracting links, exporting browser artif
 
 ## Version
 
-v0.9.1
+v0.9.2
 
 ## Features
 
@@ -152,7 +152,7 @@ ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
 
-v0.9.1 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
+v0.9.2 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
 
 ## Background Jobs
 
@@ -211,6 +211,7 @@ python -m pytest
 - Some content requires login or an existing session, which is not supported yet.
 - VPN, proxy, firewall, DNS, or other network restrictions can cause connection errors.
 - If HTTP decoding fails, try `/html_rendered`, `/screenshot`, or the supported Linux/Docker environment.
+- Windows local browser automation is best-effort. If browser jobs fail with asyncio subprocess errors, test on Ubuntu or Docker.
 
 ## Docker
 
@@ -219,7 +220,7 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.9.1 does not automate that setup.
+The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.9.2 does not automate that setup.
 
 ## Planned Features
 
