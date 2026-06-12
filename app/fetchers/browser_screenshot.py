@@ -1,5 +1,6 @@
 import asyncio
 import ipaddress
+import logging
 import re
 import socket
 from dataclasses import dataclass
@@ -14,6 +15,15 @@ from playwright.async_api import async_playwright
 from app.core.storage import ensure_free_space
 from app.core.url_validation import URLValidationError, validate_url
 from app.fetchers.browser_context import create_isolated_context
+from app.fetchers.browser_diagnostics import (
+    BROWSER_INSTALL_MESSAGE,
+    generic_browser_message,
+    is_browser_not_installed,
+    log_safe_browser_error,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 class ScreenshotError(RuntimeError):
@@ -131,16 +141,18 @@ async def capture_screenshot(
             finally:
                 await browser.close()
     except PlaywrightTimeoutError as exc:
-        raise ScreenshotTimeoutError("Browser navigation timed out") from exc
+        message = "Browser navigation timed out"
+        log_safe_browser_error(logger, exc, message)
+        raise ScreenshotTimeoutError(message) from exc
     except URLValidationError:
         raise
     except PlaywrightError as exc:
-        error_text = str(exc).lower()
-        if "executable doesn't exist" in error_text or "browser executable" in error_text:
-            raise BrowserNotInstalledError(
-                "Chromium is not installed. Run: python -m playwright install chromium"
-            ) from exc
-        raise ScreenshotError("Browser navigation failed") from exc
+        if is_browser_not_installed(exc):
+            log_safe_browser_error(logger, exc, BROWSER_INSTALL_MESSAGE)
+            raise BrowserNotInstalledError(BROWSER_INSTALL_MESSAGE) from exc
+        message = generic_browser_message("Screenshot capture")
+        log_safe_browser_error(logger, exc, message)
+        raise ScreenshotError(message) from exc
 
     size = validate_screenshot_size(output_path, options.max_size_mb)
     return ScreenshotResult(

@@ -1,5 +1,6 @@
 import asyncio
 import ipaddress
+import logging
 import re
 import socket
 from dataclasses import dataclass
@@ -14,6 +15,15 @@ from playwright.async_api import async_playwright
 from app.core.storage import ensure_free_space
 from app.core.url_validation import URLValidationError, validate_url
 from app.fetchers.browser_context import create_isolated_context
+from app.fetchers.browser_diagnostics import (
+    BROWSER_INSTALL_MESSAGE,
+    generic_browser_message,
+    is_browser_not_installed,
+    log_safe_browser_error,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 class PdfError(RuntimeError):
@@ -124,16 +134,18 @@ async def export_pdf(url: str, output_dir: Path, options: PdfOptions) -> PdfResu
             finally:
                 await browser.close()
     except PlaywrightTimeoutError as exc:
-        raise PdfTimeoutError("Browser navigation timed out") from exc
+        message = "Browser navigation timed out"
+        log_safe_browser_error(logger, exc, message)
+        raise PdfTimeoutError(message) from exc
     except URLValidationError:
         raise
     except PlaywrightError as exc:
-        error_text = str(exc).lower()
-        if "executable doesn't exist" in error_text or "browser executable" in error_text:
-            raise PdfBrowserNotInstalledError(
-                "Chromium is not installed. Run: python -m playwright install chromium"
-            ) from exc
-        raise PdfError("PDF export failed during browser navigation") from exc
+        if is_browser_not_installed(exc):
+            log_safe_browser_error(logger, exc, BROWSER_INSTALL_MESSAGE)
+            raise PdfBrowserNotInstalledError(BROWSER_INSTALL_MESSAGE) from exc
+        message = generic_browser_message("PDF export")
+        log_safe_browser_error(logger, exc, message)
+        raise PdfError(message) from exc
 
     size = validate_pdf_size(output_path, options.max_size_mb)
     return PdfResult(

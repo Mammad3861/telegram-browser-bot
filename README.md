@@ -6,7 +6,7 @@ A Telegram bot for fetching web pages, extracting links, exporting browser artif
 
 ## Version
 
-v0.9.0
+v0.9.1
 
 ## Features
 
@@ -30,7 +30,32 @@ v0.9.0
 - Docker Compose skeleton
 - Test coverage
 
+## Target Runtime
+
+The officially supported deployment runtime is Linux/Ubuntu or Docker. For production, prefer an Ubuntu server or a Docker image with the required Playwright Chromium dependencies.
+
+Windows local development is best-effort. Async Playwright behavior, VPN networking, and browser subprocess handling may differ on Windows. The application does not install or configure a Windows-specific asyncio event loop policy.
+
+Install Chromium after installing project dependencies:
+
+```bash
+python -m playwright install chromium
+```
+
 ## Setup
+
+Linux/Ubuntu:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+cp .env.example .env
+python -m playwright install chromium
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Windows best-effort local development:
 
 ```powershell
 py -3.12 -m venv .venv
@@ -38,15 +63,12 @@ py -3.12 -m venv .venv
 python -m pip install -e ".[dev]"
 Copy-Item .env.example .env
 python -m playwright install chromium
+python -m uvicorn app.main:app --reload
 ```
 
 Playwright installs with the project, but Chromium must be installed separately with the command above. The application never downloads browsers automatically at runtime.
 
-Set `TELEGRAM_BOT_TOKEN` and at least one ID in `ADMIN_TELEGRAM_IDS` inside `.env`, then run:
-
-```powershell
-python -m uvicorn app.main:app --reload
-```
+Set `TELEGRAM_BOT_TOKEN` and at least one ID in `ADMIN_TELEGRAM_IDS` inside `.env` before starting the application.
 
 The API health check is available at `http://127.0.0.1:8000/health`. Telegram polling starts automatically when a token is configured.
 
@@ -130,7 +152,7 @@ ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
 
-v0.9 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
+v0.9.1 supports direct file URLs only. It does not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
 
 ## Background Jobs
 
@@ -188,6 +210,7 @@ python -m pytest
 - PDF export may not preserve every animation, lazy-loaded element, or other dynamic page feature perfectly.
 - Some content requires login or an existing session, which is not supported yet.
 - VPN, proxy, firewall, DNS, or other network restrictions can cause connection errors.
+- If HTTP decoding fails, try `/html_rendered`, `/screenshot`, or the supported Linux/Docker environment.
 
 ## Docker
 
@@ -196,7 +219,7 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.9 does not automate that setup.
+The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.9.1 does not automate that setup.
 
 ## Planned Features
 

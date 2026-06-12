@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -26,7 +27,7 @@ from app.core.session_store import (
 )
 from app.core.storage import StorageError
 from app.core.url_validation import URLValidationError, validate_url
-from app.fetchers.http_fetcher import FetchError, HttpFetcher
+from app.fetchers.http_fetcher import FetchError, HttpFetcher, safe_response_text
 from app.fetchers.browser_screenshot import (
     BrowserNotInstalledError,
     ScreenshotError,
@@ -55,6 +56,7 @@ from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 HELP_TEXT = (
     "Commands:\n"
@@ -300,7 +302,7 @@ async def fetch_handler(message: Message, command: CommandObject) -> None:
     try:
         async with HttpFetcher() as fetcher:
             response = await fetcher.fetch(command.args.strip())
-        body = response.text[:3500]
+        body = safe_response_text(response)[:3500]
         await message.answer(f"Status: {response.status_code}\n\n{body}")
     except (URLValidationError, FetchError) as exc:
         await message.answer(f"Error: {exc}")
@@ -318,7 +320,7 @@ async def links_handler(message: Message, command: CommandObject) -> None:
         url = command.args.strip()
         async with HttpFetcher() as fetcher:
             response = await fetcher.fetch(url)
-        links = LinkExtractor.extract(response.text, str(response.url))
+        links = LinkExtractor.extract(safe_response_text(response), str(response.url))
         if not links:
             await message.answer("No links found.")
             return
@@ -458,11 +460,17 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
         EncryptionError,
         StorageError,
         OSError,
-        TelegramAPIError,
     ) as exc:
+        log_safe_job_error(exc, str(exc))
         await fail_job(job.id, message, str(exc))
-    except Exception:
-        await fail_job(job.id, message, "Rendered HTML job failed unexpectedly")
+    except TelegramAPIError as exc:
+        safe_message = "Telegram could not send the rendered HTML file"
+        log_safe_job_error(exc, safe_message)
+        await fail_job(job.id, message, safe_message)
+    except Exception as exc:
+        safe_message = "Rendered HTML job failed unexpectedly"
+        log_safe_job_error(exc, safe_message)
+        await fail_job(job.id, message, safe_message)
 
 
 def format_download_info(
@@ -607,11 +615,17 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
         EncryptionError,
         StorageError,
         OSError,
-        TelegramAPIError,
     ) as exc:
+        log_safe_job_error(exc, str(exc))
         await fail_job(job.id, message, str(exc))
-    except Exception:
-        await fail_job(job.id, message, "Screenshot job failed unexpectedly")
+    except TelegramAPIError as exc:
+        safe_message = "Telegram could not send the screenshot file"
+        log_safe_job_error(exc, safe_message)
+        await fail_job(job.id, message, safe_message)
+    except Exception as exc:
+        safe_message = "Screenshot job failed unexpectedly"
+        log_safe_job_error(exc, safe_message)
+        await fail_job(job.id, message, safe_message)
 
 
 @router.message(Command("pdf"))
@@ -673,16 +687,30 @@ async def run_pdf_job(job: Job, message: Message) -> None:
         EncryptionError,
         StorageError,
         OSError,
-        TelegramAPIError,
     ) as exc:
+        log_safe_job_error(exc, str(exc))
         await fail_job(job.id, message, str(exc))
-    except Exception:
-        await fail_job(job.id, message, "PDF job failed unexpectedly")
+    except TelegramAPIError as exc:
+        safe_message = "Telegram could not send the PDF file"
+        log_safe_job_error(exc, safe_message)
+        await fail_job(job.id, message, safe_message)
+    except Exception as exc:
+        safe_message = "PDF job failed unexpectedly"
+        log_safe_job_error(exc, safe_message)
+        await fail_job(job.id, message, safe_message)
 
 
 async def fail_job(job_id: str, message: Message, error: str) -> None:
     job_store.update_job(job_id, status="failed", error_message=error)
     await message.answer(f"Job {job_id} failed: {error}")
+
+
+def log_safe_job_error(error: BaseException, safe_message: str) -> None:
+    logger.warning(
+        "Background job failed: exception_type=%s safe_message=%s",
+        type(error).__name__,
+        safe_message,
+    )
 
 
 def format_job(job: Job) -> str:

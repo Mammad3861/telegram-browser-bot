@@ -1,6 +1,7 @@
 import asyncio
 import gzip
 import ipaddress
+import logging
 import re
 import socket
 from dataclasses import dataclass
@@ -15,6 +16,15 @@ from playwright.async_api import async_playwright
 from app.core.storage import ensure_free_space
 from app.core.url_validation import URLValidationError, validate_url
 from app.fetchers.browser_context import create_isolated_context
+from app.fetchers.browser_diagnostics import (
+    BROWSER_INSTALL_MESSAGE,
+    generic_browser_message,
+    is_browser_not_installed,
+    log_safe_browser_error,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 class RenderedHtmlError(RuntimeError):
@@ -138,16 +148,18 @@ async def export_rendered_html(
             finally:
                 await browser.close()
     except PlaywrightTimeoutError as exc:
-        raise RenderedHtmlTimeoutError("Browser navigation timed out") from exc
+        message = "Browser navigation timed out"
+        log_safe_browser_error(logger, exc, message)
+        raise RenderedHtmlTimeoutError(message) from exc
     except URLValidationError:
         raise
     except PlaywrightError as exc:
-        error_text = str(exc).lower()
-        if "executable doesn't exist" in error_text or "browser executable" in error_text:
-            raise RenderedHtmlBrowserNotInstalledError(
-                "Chromium is not installed. Run: python -m playwright install chromium"
-            ) from exc
-        raise RenderedHtmlError("Rendered HTML export failed during browser navigation") from exc
+        if is_browser_not_installed(exc):
+            log_safe_browser_error(logger, exc, BROWSER_INSTALL_MESSAGE)
+            raise RenderedHtmlBrowserNotInstalledError(BROWSER_INSTALL_MESSAGE) from exc
+        message = generic_browser_message("Rendered HTML export")
+        log_safe_browser_error(logger, exc, message)
+        raise RenderedHtmlError(message) from exc
 
     output_path, compressed = save_rendered_html(
         content, final_url, rendered_dir, options.max_html_size_mb
