@@ -29,6 +29,13 @@ from app.fetchers.browser_pdf import (
     PdfTooLargeError,
     export_pdf,
 )
+from app.fetchers.browser_html import (
+    RenderedHtmlBrowserNotInstalledError,
+    RenderedHtmlError,
+    RenderedHtmlOptions,
+    RenderedHtmlTimeoutError,
+    export_rendered_html,
+)
 from app.fetchers.file_downloader import DownloadError, FileDownloader
 from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
@@ -40,6 +47,7 @@ HELP_TEXT = (
     "/fetch <url> - fetch a web page\n"
     "/links <url> - list links from a web page\n"
     "/html <url> - export page HTML\n"
+    "/html_rendered <url> - export browser-rendered HTML\n"
     "/download <url> - download a direct file link\n"
     "/screenshot <url> - capture a full-page PNG\n"
     "/pdf <url> - export a page as PDF\n"
@@ -194,6 +202,73 @@ async def run_html_job(job: Job, message: Message) -> None:
         await fail_job(job.id, message, str(exc))
     except Exception:
         await fail_job(job.id, message, "Job failed unexpectedly")
+
+
+@router.message(Command("html_rendered", "rendered_html"))
+async def rendered_html_handler(message: Message, command: CommandObject) -> None:
+    if await reject_unless_allowed(message):
+        return
+    if not command.args:
+        await message.answer("Usage: /html_rendered <url>")
+        return
+
+    try:
+        url = validate_url(command.args.strip())
+        job = create_background_job(message, "html_rendered", url)
+        await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
+        task = asyncio.create_task(run_rendered_html_job(job, message))
+        job_store.register_task(job.id, task)
+    except (URLValidationError, JobLimitError) as exc:
+        await message.answer(f"Error: {exc}")
+
+
+async def run_rendered_html_job(job: Job, message: Message) -> None:
+    settings = get_settings()
+    job_store.update_job(job.id, status="running", progress=10)
+    options = RenderedHtmlOptions(
+        timeout_seconds=settings.browser_timeout_seconds,
+        max_html_size_mb=settings.max_html_size_mb,
+        wait_until=settings.rendered_html_wait_until,
+        viewport_width=settings.screenshot_viewport_width,
+        viewport_height=settings.screenshot_viewport_height,
+        minimum_free_mb=settings.min_free_disk_mb,
+    )
+    try:
+        result = await export_rendered_html(
+            job.url, Path(settings.downloads_dir), options
+        )
+        job_store.update_job(job.id, progress=90)
+        await message.answer_document(
+            FSInputFile(result.path),
+            caption=(
+                f"Filename: {result.filename}\n"
+                f"Size: {result.size_bytes} bytes\n"
+                f"Final URL: {result.final_url}\n"
+                f"Compressed: {'yes' if result.compressed else 'no'}"
+            ),
+        )
+        job_store.update_job(
+            job.id,
+            status="success",
+            progress=100,
+            result_message=f"Rendered HTML exported and sent: {result.filename}",
+        )
+    except asyncio.CancelledError:
+        if (current := job_store.get_job(job.id)) and current.status != "cancelled":
+            job_store.update_job(job.id, status="cancelled")
+        raise
+    except (
+        URLValidationError,
+        RenderedHtmlBrowserNotInstalledError,
+        RenderedHtmlTimeoutError,
+        RenderedHtmlError,
+        StorageError,
+        OSError,
+        TelegramAPIError,
+    ) as exc:
+        await fail_job(job.id, message, str(exc))
+    except Exception:
+        await fail_job(job.id, message, "Rendered HTML job failed unexpectedly")
 
 
 def format_download_info(

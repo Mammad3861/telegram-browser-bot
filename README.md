@@ -2,15 +2,15 @@
 
 > Early development / MVP. This project is currently experimental and not ready for public production use.
 
-A Telegram bot for fetching web pages, extracting links, exporting HTML and PDF files, safely downloading direct files, and capturing full-page screenshots.
+A Telegram bot for fetching web pages, extracting links, exporting raw or browser-rendered HTML and PDF files, safely downloading direct files, and capturing full-page screenshots.
 
 ## Version
 
-v0.6.0
+v0.7.0
 
 ## Features
 
-- Telegram bot commands: `/start`, `/help`, `/whoami`, `/access`, `/fetch`, `/links`, `/html`, `/download`, `/screenshot`, `/pdf`, `/status`, `/jobs`, `/cancel`
+- Telegram bot commands: `/start`, `/help`, `/whoami`, `/access`, `/fetch`, `/links`, `/html`, `/html_rendered`, `/download`, `/screenshot`, `/pdf`, `/status`, `/jobs`, `/cancel`
 - Secure URL validation
 - Basic SSRF protection
 - Public/private Telegram command access control
@@ -18,6 +18,7 @@ v0.6.0
 - Web page fetching with HTTPX
 - Link extraction with BeautifulSoup
 - HTML export as `.html` or `.html.gz`
+- Playwright-rendered HTML export after JavaScript execution
 - Streaming direct-file downloads with SHA256 metadata
 - In-memory background jobs with global and per-user concurrency limits
 - Playwright Chromium full-page PNG screenshots
@@ -55,6 +56,8 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/fetch <url>` - fetch and display a web page
 - `/links <url>` - extract links from a web page
 - `/html <url>` - save and send page HTML
+- `/html_rendered <url>` - save browser-rendered HTML after JavaScript execution
+- `/rendered_html <url>` - alias for `/html_rendered`
 - `/download <url>` - download and send a direct file URL
 - `/screenshot <url>` - capture and send a full-page PNG screenshot
 - `/pdf <url>` - export and send a page as PDF
@@ -72,13 +75,13 @@ ADMIN_TELEGRAM_IDS=123456789
 ALLOWED_TELEGRAM_IDS=123456789,987654321
 ```
 
-`/start`, `/help`, and `/whoami` are public. `/fetch`, `/links`, `/html`, `/download`, `/screenshot`, `/pdf`, `/status`, `/jobs`, and `/cancel` require an admin or allowed user. `/access` is admin-only. If `ALLOWED_TELEGRAM_IDS` is empty, only admins can use protected commands.
+`/start`, `/help`, and `/whoami` are public. `/fetch`, `/links`, `/html`, `/html_rendered`, `/rendered_html`, `/download`, `/screenshot`, `/pdf`, `/status`, `/jobs`, and `/cancel` require an admin or allowed user. `/access` is admin-only. If `ALLOWED_TELEGRAM_IDS` is empty, only admins can use protected commands.
 
-Access is configured through environment variables in v0.6; database-based user management is not implemented yet.
+Access is configured through environment variables in v0.7; database-based user management is not implemented yet.
 
 ## Storage Limits
 
-HTML exports are stored under `DOWNLOADS_DIR/html`, screenshots under `DOWNLOADS_DIR/screenshots`, and PDFs under `DOWNLOADS_DIR/pdf`. HTML files larger than `MAX_HTML_SIZE_MB` are sent as `.html.gz`. The bot refuses to save output when available disk space is below `MIN_FREE_DISK_MB`.
+HTTP HTML exports are stored under `DOWNLOADS_DIR/html`, rendered HTML under `DOWNLOADS_DIR/html_rendered`, screenshots under `DOWNLOADS_DIR/screenshots`, and PDFs under `DOWNLOADS_DIR/pdf`. HTML files larger than `MAX_HTML_SIZE_MB` are sent as `.html.gz`. The bot refuses to save output when available disk space is below `MIN_FREE_DISK_MB`.
 
 ```env
 MAX_HTML_SIZE_MB=5
@@ -96,6 +99,7 @@ MAX_SCREENSHOT_SIZE_MB=20
 MAX_PDF_SIZE_MB=30
 PDF_FORMAT=A4
 PDF_PRINT_BACKGROUND=true
+RENDERED_HTML_WAIT_UNTIL=domcontentloaded
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
@@ -104,9 +108,20 @@ v0.4 supports direct file URLs only. It does not scrape HTML pages to discover d
 
 ## Background Jobs
 
-`/html`, `/download`, `/screenshot`, and `/pdf` run as background jobs. The bot immediately returns a short job ID, and `/status`, `/jobs`, and `/cancel` can be used to manage the work. Users can only view and cancel their own jobs; admins can manage any job.
+`/html`, `/html_rendered`, `/download`, `/screenshot`, and `/pdf` run as background jobs. The bot immediately returns a short job ID, and `/status`, `/jobs`, and `/cancel` can be used to manage the work. Users can only view and cancel their own jobs; admins can manage any job.
 
-Jobs are stored in memory in v0.6 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
+Jobs are stored in memory in v0.7 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
+
+## HTML Modes
+
+- `/html <url>` uses a fast HTTP request and returns the server-provided HTML without running JavaScript.
+- `/html_rendered <url>` launches Playwright Chromium, runs page JavaScript until the configured load state, and exports the final DOM HTML.
+
+Rendered HTML requires Chromium:
+
+```powershell
+python -m playwright install chromium
+```
 
 ## Tests
 
@@ -118,7 +133,7 @@ python -m pytest
 
 - Some sites block automated requests and return HTTP 403.
 - Some sites block or challenge headless browsers. This project does not bypass CAPTCHAs or anti-bot systems.
-- JavaScript-heavy sites may work better with `/screenshot` than `/fetch` or `/html`.
+- JavaScript-heavy sites may work better with `/html_rendered` or `/screenshot` than `/fetch` or `/html`.
 - PDF export may not preserve every animation, lazy-loaded element, or other dynamic page feature perfectly.
 - Some content requires login or an existing session, which is not supported yet.
 - VPN, proxy, firewall, DNS, or other network restrictions can cause connection errors.
@@ -130,7 +145,7 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.6 does not automate that setup.
+The current `python:3.12-slim` Compose image does not include Chromium or Playwright system libraries. A production Docker image must install Playwright's Linux dependencies and Chromium explicitly; v0.7 does not automate that setup.
 
 ## Planned Features
 

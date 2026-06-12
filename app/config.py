@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     max_pdf_size_mb: int = 30
     pdf_format: str = "A4"
     pdf_print_background: bool = True
+    rendered_html_wait_until: str = "domcontentloaded"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
