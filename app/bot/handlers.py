@@ -27,7 +27,7 @@ from app.core.session_store import (
     load_cookies_for_domain,
     save_cookies,
 )
-from app.core.runtime_status import build_admin_status
+from app.core.runtime_status import RUNTIME_TARGET, build_admin_status
 from app.core.storage import StorageError
 from app.core.temp_files import cleanup_sent_file
 from app.core.url_sessions import (
@@ -72,6 +72,7 @@ from app.fetchers.browser_diagnostics import map_browser_runtime_error
 from app.fetchers.file_downloader import DownloadError, FileDownloader
 from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
+from app.version import APP_VERSION
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -112,6 +113,19 @@ async def menu_handler(message: Message) -> None:
     await message.answer(text("menu", language), reply_markup=menu_keyboard(language))
 
 
+@router.message(Command("about"))
+async def about_handler(message: Message) -> None:
+    language = get_language(get_user_id(message))
+    await message.answer(
+        text(
+            "about",
+            language,
+            version=APP_VERSION,
+            runtime_target=RUNTIME_TARGET,
+        )
+    )
+
+
 @router.message(Command("language"))
 async def language_handler(message: Message, command: CommandObject) -> None:
     user_id = get_user_id(message)
@@ -149,13 +163,20 @@ async def menu_callback_handler(callback: CallbackQuery) -> None:
             return
         sessions = list_sessions(user_id)
         await callback.message.answer(
-            "Saved sessions:\n" + "\n".join(sessions)
+            text("sessions_list", language, sessions="\n".join(sessions))
             if sessions
             else text("sessions", language)
         )
     elif action == "account":
         await callback.message.answer(
-            text("account", language, user_id=user_id, language=language)
+            text(
+                "account",
+                language,
+                user_id=user_id,
+                admin=text("yes" if is_admin(user_id) else "no", language),
+                access=text("yes" if is_allowed_user(user_id) else "no", language),
+                language=language,
+            )
         )
     elif action == "help":
         await callback.message.answer(
@@ -208,7 +229,7 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
     if message is None:
         return
     if parsed.action == "cancel":
-        url_session_store.remove(session.session_id, user_id)
+        url_session_store.cancel(session.session_id, user_id)
         await message.edit_text(text("url_cancelled", language))
         return
     if parsed.action == "refresh":

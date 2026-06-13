@@ -4,6 +4,7 @@ import pytest
 
 from app.core.url_sessions import (
     URLSessionExpired,
+    URLSessionNotFound,
     URLSessionNotOwned,
     URLSessionStore,
 )
@@ -20,6 +21,7 @@ def test_url_session_creation() -> None:
     assert session.user_id == 123
     assert session.url == "https://example.com"
     assert session.created_at == NOW
+    assert session.cancelled is False
 
 
 def test_url_session_owner_validation() -> None:
@@ -59,3 +61,20 @@ def test_refresh_extends_url_session_lifetime() -> None:
         now=NOW + timedelta(minutes=75),
     ) == refreshed
 
+
+def test_cancelling_url_session_makes_it_unusable() -> None:
+    store = URLSessionStore()
+    session = store.create(123, "https://example.com", now=NOW)
+
+    assert store.cancel(session.session_id, 123)
+    with pytest.raises(URLSessionNotFound):
+        store.get_for_user(session.session_id, 123, ttl_minutes=60, now=NOW)
+    assert not store.cancel(session.session_id, 123)
+
+
+def test_user_cannot_cancel_another_users_session() -> None:
+    store = URLSessionStore()
+    session = store.create(123, "https://example.com", now=NOW)
+
+    assert not store.cancel(session.session_id, 456)
+    assert store.get_for_user(session.session_id, 123, ttl_minutes=60, now=NOW) == session

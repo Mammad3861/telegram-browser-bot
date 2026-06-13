@@ -1,6 +1,7 @@
 import pytest
 
 from app.bot.handlers import HELP_TEXT
+from app.bot.i18n import text
 from app.bot.ui import (
     URL_ACTIONS,
     detect_plain_url,
@@ -53,4 +54,19 @@ def test_plain_url_detection_rejects_invalid_input(value: str) -> None:
 def test_help_text_does_not_include_secrets() -> None:
     assert "TELEGRAM_BOT_TOKEN" not in HELP_TEXT
     assert "COOKIE_ENCRYPTION_KEY" not in HELP_TEXT
+    assert "/menu" in HELP_TEXT
+    assert "/language" in HELP_TEXT
 
+
+def test_about_text_contains_version_and_runtime_without_secrets() -> None:
+    about = text(
+        "about",
+        "en",
+        version="1.1.0-alpha.1",
+        runtime_target="Linux/Ubuntu 24.04 or Docker",
+    )
+
+    assert "Telegram Browser Bot" in about
+    assert "1.1.0-alpha.1" in about
+    assert "Linux/Ubuntu 24.04 or Docker" in about
+    assert "TOKEN" not in about

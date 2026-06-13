@@ -81,6 +81,7 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/start` - start the bot and show commands
 - `/menu` - open the interactive Telegram menu
 - `/language [en|fa]` - view or change your language preference
+- `/about` - show project version and supported runtime
 - `/help` - show short, friendly command help
 - `/whoami` - show your Telegram user ID
 - `/fetch <url>` - fetch and display a web page
@@ -114,7 +115,7 @@ ADMIN_TELEGRAM_IDS=123456789
 ALLOWED_TELEGRAM_IDS=123456789,987654321
 ```
 
-`/start`, `/menu`, `/help`, `/language`, and `/whoami` are public. Browser, download, job, and cookie/session commands require an admin or allowed user. `/allow`, `/deny`, `/allowed_users`, and `/access` are admin-only. Admins always retain access.
+`/start`, `/menu`, `/help`, `/language`, `/about`, and `/whoami` are public. Browser, download, job, and cookie/session commands require an admin or allowed user. `/allow`, `/deny`, `/allowed_users`, and `/access` are admin-only. Admins always retain access.
 
 Static access is configured through environment variables. Runtime access changes are persisted locally without restarting the bot.
 

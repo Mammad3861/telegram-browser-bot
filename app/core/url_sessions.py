@@ -26,6 +26,7 @@ class URLSession:
     user_id: int
     url: str
     created_at: datetime
+    cancelled: bool = False
     last_message_id: int | None = None
 
 
@@ -69,6 +70,8 @@ class URLSessionStore:
                 raise URLSessionNotFound("URL session not found")
             if session.user_id != user_id:
                 raise URLSessionNotOwned("URL session belongs to another user")
+            if session.cancelled:
+                raise URLSessionNotFound("URL session was cancelled")
             current_time = now or datetime.now(UTC)
             if current_time - session.created_at >= timedelta(minutes=ttl_minutes):
                 self._sessions.pop(session_id, None)
@@ -80,7 +83,7 @@ class URLSessionStore:
     ) -> URLSession | None:
         with self._lock:
             session = self._sessions.get(session_id)
-            if session is None:
+            if session is None or session.cancelled:
                 return None
             updated = replace(
                 session,
@@ -90,14 +93,16 @@ class URLSessionStore:
             self._sessions[session_id] = updated
             return updated
 
-    def remove(self, session_id: str, user_id: int) -> bool:
+    def cancel(self, session_id: str, user_id: int) -> bool:
         with self._lock:
             session = self._sessions.get(session_id)
-            if session is None or session.user_id != user_id:
+            if session is None or session.user_id != user_id or session.cancelled:
                 return False
-            self._sessions.pop(session_id, None)
+            self._sessions[session_id] = replace(session, cancelled=True)
             return True
+
+    def remove(self, session_id: str, user_id: int) -> bool:
+        return self.cancel(session_id, user_id)
 
 
 url_session_store = URLSessionStore()
-

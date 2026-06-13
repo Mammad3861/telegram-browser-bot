@@ -11,6 +11,8 @@ All notable changes to this project are documented in this file.
 - Owner-bound in-memory URL sessions with configurable expiration and compact callback data.
 - `/language en` and `/language fa` with foundational English/Persian interface translations.
 - Shorter localized help text while retaining all advanced slash commands.
+- Static localized `/about` command with version and official runtime information.
+- Account menu details for Telegram ID, administrator status, access status, and language.
 
 ### Notes
 

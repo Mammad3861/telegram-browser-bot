@@ -10,13 +10,25 @@ TEXTS: dict[str, dict[str, str]] = {
         "welcome": "Telegram Browser Bot is ready. Use /menu to get started.",
         "menu": "Choose an option or send a single http/https URL.",
         "help": (
-            "Send a URL to open an action card, or use /menu.\n"
+            "Send a URL to open an action card, use /menu, or change language with "
+            "/language.\n"
             "Advanced slash commands such as /fetch, /links, /html, /screenshot, "
             "and /pdf are still available."
         ),
         "open_url": "Send one http/https URL to create an action card.",
-        "sessions": "Use /sessions to view encrypted browser sessions.",
-        "account": "Telegram ID: {user_id}\nLanguage: {language}",
+        "sessions": "No saved sessions. Use /cookies_import to add one.",
+        "sessions_list": "Saved sessions:\n{sessions}",
+        "account": (
+            "Telegram ID: {user_id}\nAdmin: {admin}\nAccess: {access}\n"
+            "Language: {language}"
+        ),
+        "yes": "yes",
+        "no": "no",
+        "about": (
+            "Telegram Browser Bot\nVersion: {version}\n"
+            "Interactive web export and browser automation for Telegram.\n"
+            "Official runtime: {runtime_target}"
+        ),
         "search_planned": "Search is planned for a future version.",
         "url_card": "URL action card\n\n{url}\n\nChoose an action:",
         "url_refreshed": "URL action card refreshed.\n\n{url}\n\nChoose an action:",
@@ -36,12 +48,23 @@ TEXTS: dict[str, dict[str, str]] = {
         "welcome": "ربات مرورگر تلگرام آماده است. برای شروع از /menu استفاده کنید.",
         "menu": "یک گزینه را انتخاب کنید یا یک نشانی http/https بفرستید.",
         "help": (
-            "یک نشانی بفرستید تا کارت عملیات ساخته شود، یا از /menu استفاده کنید.\n"
+            "یک نشانی بفرستید تا کارت عملیات ساخته شود، از /menu استفاده کنید، یا زبان را با /language تغییر دهید.\n"
             "دستورهای پیشرفته مانند /fetch، /links، /html، /screenshot و /pdf همچنان فعال هستند."
         ),
         "open_url": "یک نشانی http/https بفرستید تا کارت عملیات ساخته شود.",
-        "sessions": "برای دیدن نشست‌های رمزگذاری‌شده از /sessions استفاده کنید.",
-        "account": "شناسه تلگرام: {user_id}\nزبان: {language}",
+        "sessions": "نشستی ذخیره نشده است. برای افزودن نشست از /cookies_import استفاده کنید.",
+        "sessions_list": "نشست‌های ذخیره‌شده:\n{sessions}",
+        "account": (
+            "شناسه تلگرام: {user_id}\nمدیر: {admin}\nدسترسی: {access}\n"
+            "زبان: {language}"
+        ),
+        "yes": "بله",
+        "no": "خیر",
+        "about": (
+            "ربات مرورگر تلگرام\nنسخه: {version}\n"
+            "ابزار تعاملی خروجی وب و مرورگر برای تلگرام.\n"
+            "محیط رسمی: {runtime_target}"
+        ),
         "search_planned": "جست‌وجوی وب برای نسخه آینده برنامه‌ریزی شده است.",
         "url_card": "کارت عملیات نشانی\n\n{url}\n\nیک عملیات را انتخاب کنید:",
         "url_refreshed": "کارت عملیات تازه‌سازی شد.\n\n{url}\n\nیک عملیات را انتخاب کنید:",
