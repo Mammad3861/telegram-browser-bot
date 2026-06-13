@@ -8,7 +8,7 @@ A Telegram bot for fetching web pages, extracting links, exporting browser artif
 
 ## Version
 
-v1.0.0-alpha.1
+v1.0.1-alpha.1
 
 ## Features
 
@@ -122,6 +122,7 @@ Static allowed users come from `ALLOWED_TELEGRAM_IDS`. Runtime users are stored 
 ACCESS_STORAGE_PATH=downloads/access/allowed_users.json
 ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
 CLEANUP_MAX_AGE_HOURS=24
+DELETE_GENERATED_FILES_AFTER_SEND=true
 ```
 
 Set `ENABLE_RUNTIME_ACCESS_MANAGEMENT=false` to disable `/allow`, `/deny`, and `/allowed_users`. Existing administrators cannot be removed with `/deny`. The `downloads/access` directory may contain real Telegram user IDs and must not be committed; the project ignores the entire `downloads/` directory.
@@ -154,6 +155,7 @@ MAX_COOKIE_IMPORT_SIZE_KB=256
 ACCESS_STORAGE_PATH=downloads/access/allowed_users.json
 ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
 CLEANUP_MAX_AGE_HOURS=24
+DELETE_GENERATED_FILES_AFTER_SEND=true
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
@@ -161,6 +163,8 @@ Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully 
 Direct downloads support direct file URLs only. They do not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
 
 `/cleanup` removes files older than `CLEANUP_MAX_AGE_HOURS` only from `html`, `html_rendered`, `files`, `screenshots`, and `pdf`. It never removes runtime access data or encrypted sessions.
+
+Generated files are deleted automatically after a successful Telegram upload by default. Persistent data under `downloads/sessions` and `downloads/access` is never removed by this behavior. Set `DELETE_GENERATED_FILES_AFTER_SEND=false` to retain generated output for debugging. Administrators can still run `/cleanup` to remove old leftovers.
 
 ## Background Jobs
 
@@ -262,8 +266,8 @@ Telegram polling makes outbound connections, so ports 80 and 443 do not need to 
 Alpha releases are created automatically when a version tag matching `v*` is pushed. The release workflow runs the test suite before creating the GitHub Release and uses `CHANGELOG.md` for release notes.
 
 ```bash
-git tag v1.0.0-alpha.1
-git push origin v1.0.0-alpha.1
+git tag v1.0.1-alpha.1
+git push origin v1.0.1-alpha.1
 ```
 
 GitHub provides the generated source archives. Docker images are validated in CI but are not published.

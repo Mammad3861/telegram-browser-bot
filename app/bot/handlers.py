@@ -29,6 +29,7 @@ from app.core.session_store import (
 )
 from app.core.runtime_status import build_admin_status
 from app.core.storage import StorageError
+from app.core.temp_files import cleanup_sent_file
 from app.core.url_validation import URLValidationError, validate_url
 from app.fetchers.http_fetcher import FetchError, HttpFetcher, safe_response_text
 from app.fetchers.browser_screenshot import (
@@ -428,6 +429,11 @@ async def run_html_job(job: Job, message: Message) -> None:
             settings.min_free_disk_mb,
         )
         await message.answer_document(FSInputFile(output_path))
+        cleanup_sent_file(
+            output_path,
+            Path(settings.downloads_dir),
+            settings.delete_generated_files_after_send,
+        )
         result_message = f"HTML saved and sent: {output_path.name}"
         job_store.update_job(
             job.id, status="success", progress=100, result_message=result_message
@@ -483,6 +489,11 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
                 f"Final URL: {result.final_url}\n"
                 f"Compressed: {'yes' if result.compressed else 'no'}"
             ),
+        )
+        cleanup_sent_file(
+            result.path,
+            Path(settings.downloads_dir),
+            settings.delete_generated_files_after_send,
         )
         job_store.update_job(
             job.id,
@@ -578,6 +589,11 @@ async def run_download_job(job: Job, message: Message) -> None:
             result_message = "File saved locally; Telegram upload limit exceeded."
         else:
             await message.answer_document(FSInputFile(result.path), caption=info)
+            cleanup_sent_file(
+                result.path,
+                Path(settings.downloads_dir),
+                settings.delete_generated_files_after_send,
+            )
             result_message = f"File downloaded and sent: {result.filename}"
         job_store.update_job(
             job.id, status="success", progress=100, result_message=result_message
@@ -586,12 +602,10 @@ async def run_download_job(job: Job, message: Message) -> None:
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
-    except TelegramAPIError:
-        message_text = "Telegram could not accept the upload. The file remains saved locally."
-        job_store.update_job(
-            job.id, status="success", progress=100, result_message=message_text
-        )
-        await message.answer(message_text)
+    except TelegramAPIError as exc:
+        safe_message = "Telegram could not accept the upload. The file remains saved locally."
+        log_safe_job_error(job, exc, safe_message)
+        await fail_job(job.id, message, safe_message)
     except (URLValidationError, DownloadError, StorageError, OSError) as exc:
         await fail_job(job.id, message, str(exc))
     except Exception:
@@ -637,6 +651,11 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
                 f"Size: {result.size_bytes} bytes\n"
                 f"Final URL: {result.final_url}"
             ),
+        )
+        cleanup_sent_file(
+            result.path,
+            Path(settings.downloads_dir),
+            settings.delete_generated_files_after_send,
         )
         job_store.update_job(
             job.id,
@@ -711,6 +730,11 @@ async def run_pdf_job(job: Job, message: Message) -> None:
                 f"Size: {result.size_bytes} bytes\n"
                 f"Final URL: {result.final_url}"
             ),
+        )
+        cleanup_sent_file(
+            result.path,
+            Path(settings.downloads_dir),
+            settings.delete_generated_files_after_send,
         )
         job_store.update_job(
             job.id,
