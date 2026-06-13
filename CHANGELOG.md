@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.1.1-alpha.1] - 2026-06-13
+
+### Added
+
+- Native Telegram Menu button command registration during bot startup.
+- Concise default user commands with English and Persian descriptions.
+- Per-administrator chat command menus for runtime access and maintenance commands.
+- `REGISTER_BOT_COMMANDS` setting, enabled by default.
+
+### Reliability
+
+- Missing bot tokens continue to leave API-only startup available.
+- Telegram command registration failures log a safe warning without stopping polling.
+
 ## [v1.1.0-alpha.1] - 2026-06-13
 
 ### Added

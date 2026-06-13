@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from app.api.routes import router
 from app.bot.dispatcher import create_dispatcher
+from app.bot.commands import register_bot_commands
 from app.config import get_settings
 from app.version import APP_VERSION
 
@@ -22,6 +23,7 @@ async def lifespan(_: FastAPI):
 
     if settings.telegram_bot_token:
         bot = Bot(token=settings.telegram_bot_token)
+        await register_bot_commands(bot, settings)
         polling_task = asyncio.create_task(create_dispatcher().start_polling(bot))
         logger.info("Telegram bot polling started")
     else:
