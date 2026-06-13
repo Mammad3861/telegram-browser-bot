@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     enable_runtime_access_management: bool = True
     cleanup_max_age_hours: int = 24
     delete_generated_files_after_send: bool = True
+    url_session_ttl_minutes: int = 60
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

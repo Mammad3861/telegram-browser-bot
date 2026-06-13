@@ -4,10 +4,10 @@ import logging
 from pathlib import Path
 from urllib.parse import urlparse
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command, CommandObject
-from aiogram.types import FSInputFile, Message
+from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from app.config import get_settings, parse_telegram_ids
 from app.core.access_control import deny_runtime_user, is_admin, is_allowed_user
@@ -30,7 +30,20 @@ from app.core.session_store import (
 from app.core.runtime_status import build_admin_status
 from app.core.storage import StorageError
 from app.core.temp_files import cleanup_sent_file
+from app.core.url_sessions import (
+    URLSessionExpired,
+    URLSessionNotFound,
+    URLSessionNotOwned,
+    url_session_store,
+)
 from app.core.url_validation import URLValidationError, validate_url
+from app.bot.i18n import get_language, set_language, text
+from app.bot.ui import (
+    detect_plain_url,
+    menu_keyboard,
+    parse_url_callback_data,
+    url_action_keyboard,
+)
 from app.fetchers.http_fetcher import FetchError, HttpFetcher, safe_response_text
 from app.fetchers.browser_screenshot import (
     BrowserNotInstalledError,
@@ -63,32 +76,8 @@ from app.fetchers.link_extractor import LinkExtractor
 router = Router()
 logger = logging.getLogger(__name__)
 
-HELP_TEXT = (
-    "Commands:\n"
-    "/fetch <url> - fetch a web page\n"
-    "/links <url> - list links from a web page\n"
-    "/html <url> - export page HTML\n"
-    "/html_rendered <url> - export browser-rendered HTML\n"
-    "/download <url> - download a direct file link\n"
-    "/screenshot <url> - capture a full-page PNG\n"
-    "/pdf <url> - export a page as PDF\n"
-    "/cookies_help - show cookie import help\n"
-    "/cookies_import <domain> - import cookies\n"
-    "/sessions - list your saved sessions\n"
-    "/delete_session <domain> - delete a saved session\n"
-    "/allow <telegram_id> [note] - grant runtime access\n"
-    "/deny <telegram_id> - revoke runtime access\n"
-    "/allowed_users - list configured users\n"
-    "/admin_status - show runtime status\n"
-    "/cleanup - delete old generated files\n"
-    "/status <job_id> - show job status\n"
-    "/jobs - list recent jobs\n"
-    "/cancel <job_id> - cancel an active job\n"
-    "/whoami - show your Telegram ID\n"
-    "/help - show this help"
-)
+HELP_TEXT = text("help", "en")
 
-ACCESS_DENIED = "Access denied. Ask the bot owner for access."
 ADMIN_REQUIRED = "Admin access required."
 pending_cookie_imports: dict[int, str] = {}
 
@@ -100,19 +89,175 @@ def get_user_id(message: Message) -> int | None:
 async def reject_unless_allowed(message: Message) -> bool:
     user_id = get_user_id(message)
     if user_id is None or not is_allowed_user(user_id):
-        await message.answer(ACCESS_DENIED)
+        await message.answer(text("access_denied", get_language(user_id)))
         return True
     return False
 
 
 @router.message(Command("start"))
 async def start_handler(message: Message) -> None:
-    await message.answer("Telegram Browser Bot is ready.\n\n" + HELP_TEXT)
+    language = get_language(get_user_id(message))
+    await message.answer(text("welcome", language), reply_markup=menu_keyboard(language))
 
 
 @router.message(Command("help"))
 async def help_handler(message: Message) -> None:
-    await message.answer(HELP_TEXT)
+    language = get_language(get_user_id(message))
+    await message.answer(text("help", language), reply_markup=menu_keyboard(language))
+
+
+@router.message(Command("menu"))
+async def menu_handler(message: Message) -> None:
+    language = get_language(get_user_id(message))
+    await message.answer(text("menu", language), reply_markup=menu_keyboard(language))
+
+
+@router.message(Command("language"))
+async def language_handler(message: Message, command: CommandObject) -> None:
+    user_id = get_user_id(message)
+    language = get_language(user_id)
+    if not command.args:
+        await message.answer(text("language_current", language, language=language))
+        return
+    if user_id is None:
+        await message.answer(text("language_usage", language))
+        return
+    try:
+        selected = set_language(user_id, command.args)
+    except ValueError:
+        await message.answer(text("language_usage", language))
+        return
+    await message.answer(
+        text("language_updated", selected, language=selected),
+        reply_markup=menu_keyboard(selected),
+    )
+
+
+@router.callback_query(F.data.startswith("menu:"))
+async def menu_callback_handler(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    language = get_language(user_id)
+    action = (callback.data or "").partition(":")[2]
+    await callback.answer()
+    if callback.message is None:
+        return
+    if action == "open_url":
+        await callback.message.answer(text("open_url", language))
+    elif action == "sessions":
+        if not is_allowed_user(user_id):
+            await callback.message.answer(text("access_denied", language))
+            return
+        sessions = list_sessions(user_id)
+        await callback.message.answer(
+            "Saved sessions:\n" + "\n".join(sessions)
+            if sessions
+            else text("sessions", language)
+        )
+    elif action == "account":
+        await callback.message.answer(
+            text("account", language, user_id=user_id, language=language)
+        )
+    elif action == "help":
+        await callback.message.answer(
+            text("help", language), reply_markup=menu_keyboard(language)
+        )
+    elif action == "search":
+        await callback.message.answer(text("search_planned", language))
+
+
+async def create_url_card(message: Message, user_id: int, url: str) -> None:
+    language = get_language(user_id)
+    session = url_session_store.create(user_id, url)
+    sent = await message.answer(
+        text("url_card", language, url=url),
+        reply_markup=url_action_keyboard(session.session_id, language),
+    )
+    url_session_store.touch(session.session_id, sent.message_id)
+
+
+@router.callback_query(F.data.startswith("url:"))
+async def url_action_callback_handler(callback: CallbackQuery) -> None:
+    parsed = parse_url_callback_data(callback.data)
+    if parsed is None:
+        await callback.answer("Invalid action", show_alert=True)
+        return
+    user_id = callback.from_user.id
+    language = get_language(user_id)
+    if not is_allowed_user(user_id):
+        await callback.answer(text("access_denied", language), show_alert=True)
+        return
+    try:
+        session = url_session_store.get_for_user(
+            parsed.session_id,
+            user_id,
+            get_settings().url_session_ttl_minutes,
+        )
+        validate_url(session.url)
+    except (URLSessionNotFound, URLSessionExpired):
+        await callback.answer(text("session_expired", language), show_alert=True)
+        return
+    except URLSessionNotOwned:
+        await callback.answer(text("session_not_owned", language), show_alert=True)
+        return
+    except URLValidationError:
+        await callback.answer(text("invalid_url", language), show_alert=True)
+        return
+
+    await callback.answer()
+    message = callback.message
+    if message is None:
+        return
+    if parsed.action == "cancel":
+        url_session_store.remove(session.session_id, user_id)
+        await message.edit_text(text("url_cancelled", language))
+        return
+    if parsed.action == "refresh":
+        url_session_store.touch(session.session_id, message.message_id)
+        await message.edit_text(
+            text("url_refreshed", language, url=session.url),
+            reply_markup=url_action_keyboard(session.session_id, language),
+        )
+        return
+    if parsed.action == "links":
+        try:
+            async with HttpFetcher() as fetcher:
+                response = await fetcher.fetch(session.url)
+            links = LinkExtractor.extract(
+                safe_response_text(response), str(response.url)
+            )
+            await message.answer(
+                "\n".join(links[:50])[:4000] if links else text("no_links", language)
+            )
+        except (URLValidationError, FetchError) as exc:
+            await message.answer(text("request_failed", language, error=str(exc)))
+        return
+
+    command = "html_rendered" if parsed.action == "rendered_html" else parsed.action
+    settings = get_settings()
+    if command == "download":
+        if download_quota.remaining(
+            user_id, settings.max_downloads_per_user_per_day
+        ) <= 0:
+            await message.answer("Daily download quota exceeded. Try again tomorrow.")
+            return
+    try:
+        job = create_background_job_for_user(user_id, command, session.url)
+        if command == "download":
+            download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
+        await message.answer(
+            text("job_started", language, job_id=job.id, status=job.status)
+        )
+        runner = {
+            "html": run_html_job,
+            "html_rendered": run_rendered_html_job,
+            "download": run_download_job,
+            "screenshot": run_screenshot_job,
+            "pdf": run_pdf_job,
+        }[command]
+        task = asyncio.create_task(runner(job, message))
+        job_store.register_task(job.id, task)
+    except JobLimitError as exc:
+        await message.answer(text("request_failed", language, error=str(exc)))
 
 
 @router.message(Command("whoami"))
@@ -397,6 +542,10 @@ def create_background_job(message: Message, command: str, url: str) -> Job:
     user_id = get_user_id(message)
     if user_id is None:
         raise JobLimitError("Unable to identify the requesting user.")
+    return create_background_job_for_user(user_id, command, url)
+
+
+def create_background_job_for_user(user_id: int, command: str, url: str) -> Job:
     settings = get_settings()
     return job_store.create_job(
         user_id,
@@ -848,35 +997,50 @@ async def cancel_handler(message: Message, command: CommandObject) -> None:
 
 
 @router.message()
-async def pending_cookie_import_handler(message: Message) -> None:
+async def text_message_handler(message: Message) -> None:
     user_id = get_user_id(message)
-    if user_id is None or user_id not in pending_cookie_imports or not message.text:
+    if user_id is None or not message.text:
         return
+    if user_id in pending_cookie_imports:
+        if not is_allowed_user(user_id):
+            pending_cookie_imports.pop(user_id, None)
+            await message.answer(text("access_denied", get_language(user_id)))
+            return
+
+        settings = get_settings()
+        domain = pending_cookie_imports[user_id]
+        if not settings.enable_cookie_import:
+            pending_cookie_imports.pop(user_id, None)
+            await message.answer("Cookie import is disabled.")
+            return
+        if not settings.cookie_encryption_key:
+            pending_cookie_imports.pop(user_id, None)
+            await message.answer(
+                "Cookie encryption key is not configured. Ask the bot owner to configure it."
+            )
+            return
+        try:
+            cookies = validate_cookies_json(
+                message.text, domain, settings.max_cookie_import_size_kb
+            )
+            save_cookies(user_id, domain, json.dumps(cookies, separators=(",", ":")))
+        except (CookieValidationError, EncryptionError, OSError) as exc:
+            await message.answer(f"Error: {exc}")
+            return
+
+        pending_cookie_imports.pop(user_id, None)
+        await message.answer(f"Cookies saved for {domain}")
+        return
+
+    stripped = message.text.strip()
+    if not stripped.lower().startswith(("http://", "https://")):
+        return
+    language = get_language(user_id)
     if not is_allowed_user(user_id):
-        pending_cookie_imports.pop(user_id, None)
-        await message.answer(ACCESS_DENIED)
+        await message.answer(text("access_denied", language))
         return
-
-    settings = get_settings()
-    domain = pending_cookie_imports[user_id]
-    if not settings.enable_cookie_import:
-        pending_cookie_imports.pop(user_id, None)
-        await message.answer("Cookie import is disabled.")
+    url = detect_plain_url(message.text)
+    if url is None:
+        await message.answer(text("invalid_url", language))
         return
-    if not settings.cookie_encryption_key:
-        pending_cookie_imports.pop(user_id, None)
-        await message.answer(
-            "Cookie encryption key is not configured. Ask the bot owner to configure it."
-        )
-        return
-    try:
-        cookies = validate_cookies_json(
-            message.text, domain, settings.max_cookie_import_size_kb
-        )
-        save_cookies(user_id, domain, json.dumps(cookies, separators=(",", ":")))
-    except (CookieValidationError, EncryptionError, OSError) as exc:
-        await message.answer(f"Error: {exc}")
-        return
-
-    pending_cookie_imports.pop(user_id, None)
-    await message.answer(f"Cookies saved for {domain}")
+    await create_url_card(message, user_id, url)

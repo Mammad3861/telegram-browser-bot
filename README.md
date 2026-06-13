@@ -2,17 +2,19 @@
 
 [![CI](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml)
 
-> v1.0 alpha. This project is ready for controlled early testing, not unrestricted public deployment.
+> v1.1 alpha. This project is ready for controlled early testing, not unrestricted public deployment.
 
 A Telegram bot for fetching web pages, extracting links, exporting browser artifacts, downloading direct files, and using encrypted per-user browser sessions.
 
 ## Version
 
-v1.0.1-alpha.1
+v1.1.0-alpha.1
 
 ## Features
 
 - Telegram bot commands include browser exports, downloads, jobs, and encrypted cookie session management.
+- Interactive Telegram menu and URL action cards with inline buttons
+- Basic in-memory English/Persian language preferences
 - Secure URL validation
 - Basic SSRF protection
 - Public/private Telegram command access control
@@ -77,7 +79,9 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 ## Commands
 
 - `/start` - start the bot and show commands
-- `/help` - show command help
+- `/menu` - open the interactive Telegram menu
+- `/language [en|fa]` - view or change your language preference
+- `/help` - show short, friendly command help
 - `/whoami` - show your Telegram user ID
 - `/fetch <url>` - fetch and display a web page
 - `/links <url>` - extract links from a web page
@@ -110,7 +114,7 @@ ADMIN_TELEGRAM_IDS=123456789
 ALLOWED_TELEGRAM_IDS=123456789,987654321
 ```
 
-`/start`, `/help`, and `/whoami` are public. Browser, download, job, and cookie/session commands require an admin or allowed user. `/allow`, `/deny`, `/allowed_users`, and `/access` are admin-only. Admins always retain access.
+`/start`, `/menu`, `/help`, `/language`, and `/whoami` are public. Browser, download, job, and cookie/session commands require an admin or allowed user. `/allow`, `/deny`, `/allowed_users`, and `/access` are admin-only. Admins always retain access.
 
 Static access is configured through environment variables. Runtime access changes are persisted locally without restarting the bot.
 
@@ -123,6 +127,7 @@ ACCESS_STORAGE_PATH=downloads/access/allowed_users.json
 ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
 CLEANUP_MAX_AGE_HOURS=24
 DELETE_GENERATED_FILES_AFTER_SEND=true
+URL_SESSION_TTL_MINUTES=60
 ```
 
 Set `ENABLE_RUNTIME_ACCESS_MANAGEMENT=false` to disable `/allow`, `/deny`, and `/allowed_users`. Existing administrators cannot be removed with `/deny`. The `downloads/access` directory may contain real Telegram user IDs and must not be committed; the project ignores the entire `downloads/` directory.
@@ -156,6 +161,7 @@ ACCESS_STORAGE_PATH=downloads/access/allowed_users.json
 ENABLE_RUNTIME_ACCESS_MANAGEMENT=true
 CLEANUP_MAX_AGE_HOURS=24
 DELETE_GENERATED_FILES_AFTER_SEND=true
+URL_SESSION_TTL_MINUTES=60
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
@@ -165,6 +171,14 @@ Direct downloads support direct file URLs only. They do not scrape HTML pages to
 `/cleanup` removes files older than `CLEANUP_MAX_AGE_HOURS` only from `html`, `html_rendered`, `files`, `screenshots`, and `pdf`. It never removes runtime access data or encrypted sessions.
 
 Generated files are deleted automatically after a successful Telegram upload by default. Persistent data under `downloads/sessions` and `downloads/access` is never removed by this behavior. Set `DELETE_GENERATED_FILES_AFTER_SEND=false` to retain generated output for debugging. Administrators can still run `/cleanup` to remove old leftovers.
+
+## Interactive URL Cards
+
+Allowed users can send a single public `http://` or `https://` URL as a plain message. The bot validates it and returns an action card without fetching the page automatically. Inline buttons provide Screenshot, PDF, HTML, Rendered HTML, Links, Download, Refresh, and Cancel actions.
+
+URL cards use short in-memory session IDs rather than full URLs in callback data. Sessions belong to their creator, expire after `URL_SESSION_TTL_MINUTES`, and reset when the process restarts. Refresh extends the card lifetime without fetching the URL.
+
+`/language en` and `/language fa` select the English or Persian interface. Persian support is currently basic and focuses on the menu, help, URL cards, and common messages. Language preferences are in memory and reset on restart.
 
 ## Background Jobs
 
@@ -266,21 +280,19 @@ Telegram polling makes outbound connections, so ports 80 and 443 do not need to 
 Alpha releases are created automatically when a version tag matching `v*` is pushed. The release workflow runs the test suite before creating the GitHub Release and uses `CHANGELOG.md` for release notes.
 
 ```bash
-git tag v1.0.1-alpha.1
-git push origin v1.0.1-alpha.1
+git tag v1.1.0-alpha.1
+git push origin v1.1.0-alpha.1
 ```
 
 GitHub provides the generated source archives. Docker images are validated in CI but are not published.
 
 ## Post-v1 Roadmap
 
-- Interactive Telegram menu with inline buttons
-- URL session cards
-- Per-session action buttons: Screenshot, PDF, HTML, Rendered HTML, Links, Download, Refresh, Cancel
-- Persian language support
+- Real web search
 - Admin-editable bot texts, descriptions, and help messages
-- Better UX with modern Telegram-style messages
-- Optional per-user language preference
+- Per-language editable welcome, help, and about texts
+- Persistent user language preferences
+- Richer Telegram UI and editable job-status cards
 
 
 ## Project Status

@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.1.0-alpha.1] - 2026-06-13
+
+### Added
+
+- Interactive `/menu` with Open URL, Sessions, Account, Help, and planned Search actions.
+- URL action cards for plain validated URLs with Screenshot, PDF, HTML, Rendered HTML, Links, Download, Refresh, and Cancel buttons.
+- Owner-bound in-memory URL sessions with configurable expiration and compact callback data.
+- `/language en` and `/language fa` with foundational English/Persian interface translations.
+- Shorter localized help text while retaining all advanced slash commands.
+
+### Notes
+
+- URL sessions and language preferences reset when the bot restarts.
+- Web search, persistent language preferences, and admin-editable per-language texts remain planned features.
+
 ## [v1.0.1-alpha.1] - 2026-06-13
 
 ### Fixed
