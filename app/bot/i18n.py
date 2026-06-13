@@ -1,4 +1,9 @@
+from pathlib import Path
 from typing import Literal
+
+from app.config import get_settings
+from app.core.bot_text_store import get_bot_text
+from app.core.preference_store import get_user_language, set_user_language
 
 
 Language = Literal["en", "fa"]
@@ -100,29 +105,42 @@ TEXTS: dict[str, dict[str, str]] = {
     },
 }
 
-_preferences: dict[int, Language] = {}
-
-
-def get_language(user_id: int | None) -> Language:
+def get_language(user_id: int | None, path: Path | None = None) -> Language:
     if user_id is None:
         return DEFAULT_LANGUAGE
-    return _preferences.get(user_id, DEFAULT_LANGUAGE)
+    target = path or Path(get_settings().user_preferences_path)
+    language = get_user_language(target, user_id, DEFAULT_LANGUAGE)
+    return language if language in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE  # type: ignore[return-value]
 
 
-def set_language(user_id: int, language: str) -> Language:
+def set_language(
+    user_id: int, language: str, path: Path | None = None
+) -> Language:
     normalized = language.strip().lower()
     if normalized not in SUPPORTED_LANGUAGES:
         raise ValueError("Unsupported language")
     selected: Language = normalized  # type: ignore[assignment]
-    _preferences[user_id] = selected
+    target = path or Path(get_settings().user_preferences_path)
+    set_user_language(target, user_id, selected)
     return selected
 
 
-def clear_language_preferences() -> None:
-    _preferences.clear()
+def clear_language_preferences(path: Path | None = None) -> None:
+    target = path or Path(get_settings().user_preferences_path)
+    try:
+        target.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def text(key: str, locale: str = DEFAULT_LANGUAGE, **values: object) -> str:
     selected = locale if locale in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
     template = TEXTS.get(selected, {}).get(key) or TEXTS[DEFAULT_LANGUAGE].get(key, key)
     return template.format(**values)
+
+
+def bot_text(key: str, locale: str = DEFAULT_LANGUAGE, **values: object) -> str:
+    override = get_bot_text(Path(get_settings().bot_texts_path), key, locale)
+    if override is not None:
+        return override
+    return text(key, locale, **values)

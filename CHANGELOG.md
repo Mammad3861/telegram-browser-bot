@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.3.0-alpha.1] - 2026-06-14
+
+### Added
+
+- Atomic JSON persistence for per-user English/Persian language preferences.
+- Language-specific editable `welcome`, `help`, and `about` text overrides.
+- Admin-only `/texts`, `/set_text`, `/reset_text`, and `/preview_text` commands.
+- Configurable preference/text storage paths and editable-text length limit.
+
+### Reliability
+
+- Corrupted preference or text JSON logs a safe warning and falls back to defaults.
+- Manual cleanup and post-send cleanup never touch preferences or editable texts.
+- Docker's existing `downloads` volume persists both stores across rebuilds and restarts.
+
 ## [v1.2.0-alpha.1] - 2026-06-14
 
 ### Added

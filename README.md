@@ -8,7 +8,7 @@ A Telegram bot for fetching web pages, extracting links, exporting browser artif
 
 ## Version
 
-v1.2.0-alpha.1
+v1.3.0-alpha.1
 
 ## Features
 
@@ -16,7 +16,8 @@ v1.2.0-alpha.1
 - Interactive Telegram menu and URL action cards with inline buttons
 - Native Telegram Menu button command registration with English/Persian descriptions
 - Basic DuckDuckGo HTML web search with interactive result cards
-- Basic in-memory English/Persian language preferences
+- English/Persian interface preferences
+- Persistent language preferences and admin-editable welcome/help/about texts
 - Secure URL validation
 - Basic SSRF protection
 - Public/private Telegram command access control
@@ -104,6 +105,10 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/allowed_users` - list static and runtime allowed users (admin only)
 - `/admin_status` - show safe application and storage diagnostics (admin only)
 - `/cleanup` - delete generated files older than the configured retention period (admin only)
+- `/texts` - list editable bot text keys (admin only)
+- `/set_text <key> <lang> <text>` - set an editable bot text (admin only)
+- `/reset_text <key> [lang]` - reset an editable text to default (admin only)
+- `/preview_text <key> [lang]` - preview the effective text (admin only)
 - `/status <job_id>` - show progress and result for a job
 - `/jobs` - list recent jobs (admins see all jobs)
 - `/cancel <job_id>` - cancel an active job
@@ -138,6 +143,9 @@ SEARCH_RESULTS_LIMIT=5
 SEARCH_TIMEOUT_SECONDS=15
 SEARCH_QUERY_MAX_LENGTH=200
 SEARCH_SESSION_TTL_MINUTES=30
+USER_PREFERENCES_PATH=downloads/preferences/user_preferences.json
+BOT_TEXTS_PATH=downloads/texts/bot_texts.json
+BOT_TEXT_MAX_LENGTH=3000
 ```
 
 Set `ENABLE_RUNTIME_ACCESS_MANAGEMENT=false` to disable `/allow`, `/deny`, and `/allowed_users`. Existing administrators cannot be removed with `/deny`. The `downloads/access` directory may contain real Telegram user IDs and must not be committed; the project ignores the entire `downloads/` directory.
@@ -178,6 +186,9 @@ SEARCH_RESULTS_LIMIT=5
 SEARCH_TIMEOUT_SECONDS=15
 SEARCH_QUERY_MAX_LENGTH=200
 SEARCH_SESSION_TTL_MINUTES=30
+USER_PREFERENCES_PATH=downloads/preferences/user_preferences.json
+BOT_TEXTS_PATH=downloads/texts/bot_texts.json
+BOT_TEXT_MAX_LENGTH=3000
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
@@ -194,13 +205,19 @@ Allowed users can send a single public `http://` or `https://` URL as a plain me
 
 URL cards use short in-memory session IDs rather than full URLs in callback data. Sessions belong to their creator, expire after `URL_SESSION_TTL_MINUTES`, and reset when the process restarts. Refresh extends the card lifetime without fetching the URL.
 
-`/language en` and `/language fa` select the English or Persian interface. Persian support is currently basic and focuses on the menu, help, URL cards, and common messages. Language preferences are in memory and reset on restart.
+`/language en` and `/language fa` select the English or Persian interface. Persian support is currently basic and focuses on the menu, help, URL cards, and common messages. Language preferences are stored in `downloads/preferences/user_preferences.json` and survive restarts.
+
+## Editable Bot Texts
+
+Administrators can customize `welcome`, `help`, and `about` independently for `en` and `fa` using `/set_text`. `/preview_text` shows the effective value, while `/reset_text` removes an override and restores the built-in i18n default. Text length is limited by `BOT_TEXT_MAX_LENGTH`.
+
+Overrides are stored atomically in `downloads/texts/bot_texts.json`. Invalid or corrupted JSON falls back to built-in text without preventing startup. Command names, callback data, and other bot behavior are not editable through this feature.
 
 ## Telegram Menu Button
 
 When the bot starts with a configured token, it registers a concise native Telegram command menu containing `/start`, `/menu`, `/search`, `/help`, `/language`, `/about`, `/sessions`, and `/whoami`. Persian command descriptions are registered for Telegram clients using the `fa` language code.
 
-Configured administrators receive a chat-scoped menu that also includes `/admin_status`, `/allowed_users`, `/allow`, `/deny`, and `/cleanup`. Advanced browser slash commands remain available without cluttering the native Menu button.
+Configured administrators receive a chat-scoped menu that also includes access, cleanup, and editable-text commands. Advanced browser slash commands remain available without cluttering the native Menu button.
 
 Set `REGISTER_BOT_COMMANDS=false` to skip command registration. Registration errors are logged as warnings and do not prevent bot polling from starting.
 
@@ -303,7 +320,7 @@ curl http://127.0.0.1:18080/health
 docker compose down
 ```
 
-The `./downloads:/app/downloads` mount persists generated files, runtime access data, and encrypted sessions across container replacement. Do not commit this directory.
+The `./downloads:/app/downloads` mount persists generated files, runtime access data, encrypted sessions, language preferences, and editable bot texts across container replacement. `downloads/preferences` and `downloads/texts` survive rebuilds and restarts and must not be committed.
 
 Telegram polling makes outbound connections, so ports 80 and 443 do not need to be exposed. Port `8000` is published as `127.0.0.1:18080` only for local health checks. If `TELEGRAM_BOT_TOKEN` is missing, the API and health endpoint still start while polling remains disabled. If `COOKIE_ENCRYPTION_KEY` is missing, cookie import is disabled while other features continue to work.
 
@@ -312,8 +329,8 @@ Telegram polling makes outbound connections, so ports 80 and 443 do not need to 
 Alpha releases are created automatically when a version tag matching `v*` is pushed. The release workflow runs the test suite before creating the GitHub Release and uses `CHANGELOG.md` for release notes.
 
 ```bash
-git tag v1.2.0-alpha.1
-git push origin v1.2.0-alpha.1
+git tag v1.3.0-alpha.1
+git push origin v1.3.0-alpha.1
 ```
 
 GitHub provides the generated source archives. Docker images are validated in CI but are not published.
@@ -321,9 +338,7 @@ GitHub provides the generated source archives. Docker images are validated in CI
 ## Post-v1 Roadmap
 
 - Additional search providers and richer result presentation
-- Admin-editable bot texts, descriptions, and help messages
-- Per-language editable welcome, help, and about texts
-- Persistent user language preferences
+- Additional editable bot descriptions and presentation settings
 - Richer Telegram UI and editable job-status cards
 
 

@@ -1,28 +1,27 @@
 import pytest
 
+from app.config import Settings
+from app.core.bot_text_store import set_bot_text
+
 from app.bot.i18n import (
     TEXTS,
-    clear_language_preferences,
+    bot_text,
     get_language,
     set_language,
     text,
 )
 
 
-@pytest.fixture(autouse=True)
-def reset_preferences() -> None:
-    clear_language_preferences()
+def test_language_preference_defaults_to_english(tmp_path) -> None:
+    path = tmp_path / "preferences.json"
+    assert get_language(123, path) == "en"
+    assert set_language(123, "fa", path) == "fa"
+    assert get_language(123, path) == "fa"
 
 
-def test_language_preference_defaults_to_english() -> None:
-    assert get_language(123) == "en"
-    assert set_language(123, "fa") == "fa"
-    assert get_language(123) == "fa"
-
-
-def test_rejects_unsupported_language() -> None:
+def test_rejects_unsupported_language(tmp_path) -> None:
     with pytest.raises(ValueError):
-        set_language(123, "de")
+        set_language(123, "de", tmp_path / "preferences.json")
 
 
 def test_text_lookup_supports_english_and_persian() -> None:
@@ -41,3 +40,13 @@ def test_search_messages_exist_and_fallback_to_english(monkeypatch) -> None:
     assert text("search_unavailable", "fa") == TEXTS["fa"]["search_unavailable"]
     monkeypatch.delitem(TEXTS["fa"], "search_expired")
     assert text("search_expired", "fa") == TEXTS["en"]["search_expired"]
+
+
+def test_editable_bot_text_overrides_and_falls_back(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "bot_texts.json"
+    settings = Settings(_env_file=None, bot_texts_path=str(path))
+    monkeypatch.setattr("app.bot.i18n.get_settings", lambda: settings)
+    set_bot_text(path, "welcome", "en", "Custom welcome", 3000)
+
+    assert bot_text("welcome", "en") == "Custom welcome"
+    assert bot_text("help", "en") == TEXTS["en"]["help"]

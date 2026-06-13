@@ -47,6 +47,10 @@ def build_admin_commands(language: str = "en") -> list[BotCommand]:
             "allow": "دادن دسترسی به کاربر",
             "deny": "لغو دسترسی کاربر",
             "cleanup": "حذف فایل‌های قدیمی",
+            "texts": "مدیریت متن‌های ربات",
+            "set_text": "تنظیم متن ربات",
+            "reset_text": "بازنشانی متن ربات",
+            "preview_text": "پیش‌نمایش متن ربات",
         }
         if language == "fa"
         else {
@@ -55,6 +59,10 @@ def build_admin_commands(language: str = "en") -> list[BotCommand]:
             "allow": "Grant runtime access",
             "deny": "Revoke runtime access",
             "cleanup": "Delete old generated files",
+            "texts": "List editable bot texts",
+            "set_text": "Set a bot text",
+            "reset_text": "Reset a bot text",
+            "preview_text": "Preview a bot text",
         }
     )
     return [

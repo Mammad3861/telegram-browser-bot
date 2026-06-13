@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     search_timeout_seconds: float = 15.0
     search_query_max_length: int = 200
     search_session_ttl_minutes: int = 30
+    user_preferences_path: str = "downloads/preferences/user_preferences.json"
+    bot_texts_path: str = "downloads/texts/bot_texts.json"
+    bot_text_max_length: int = 3000
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

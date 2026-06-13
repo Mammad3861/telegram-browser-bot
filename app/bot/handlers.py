@@ -19,6 +19,12 @@ from app.core.download_quota import download_quota
 from app.core.cookies import CookieValidationError, normalize_domain, validate_cookies_json
 from app.core.command_args import CommandArgumentError, parse_single_url_arg, url_usage
 from app.core.cleanup import cleanup_generated_files
+from app.core.bot_text_store import (
+    BotTextValidationError,
+    EDITABLE_TEXT_KEYS,
+    reset_bot_text,
+    set_bot_text,
+)
 from app.core.encryption import EncryptionError
 from app.core.jobs import Job, JobLimitError, job_store
 from app.core.session_store import (
@@ -37,7 +43,7 @@ from app.core.url_sessions import (
     url_session_store,
 )
 from app.core.url_validation import URLValidationError, validate_url
-from app.bot.i18n import get_language, set_language, text
+from app.bot.i18n import bot_text, get_language, set_language, text
 from app.bot.ui import (
     detect_plain_url,
     menu_keyboard,
@@ -115,13 +121,17 @@ async def reject_unless_allowed(message: Message) -> bool:
 @router.message(Command("start"))
 async def start_handler(message: Message) -> None:
     language = get_language(get_user_id(message))
-    await message.answer(text("welcome", language), reply_markup=menu_keyboard(language))
+    await message.answer(
+        bot_text("welcome", language), reply_markup=menu_keyboard(language)
+    )
 
 
 @router.message(Command("help"))
 async def help_handler(message: Message) -> None:
     language = get_language(get_user_id(message))
-    await message.answer(text("help", language), reply_markup=menu_keyboard(language))
+    await message.answer(
+        bot_text("help", language), reply_markup=menu_keyboard(language)
+    )
 
 
 @router.message(Command("menu"))
@@ -134,7 +144,7 @@ async def menu_handler(message: Message) -> None:
 async def about_handler(message: Message) -> None:
     language = get_language(get_user_id(message))
     await message.answer(
-        text(
+        bot_text(
             "about",
             language,
             version=APP_VERSION,
@@ -197,7 +207,7 @@ async def menu_callback_handler(callback: CallbackQuery) -> None:
         )
     elif action == "help":
         await callback.message.answer(
-            text("help", language), reply_markup=menu_keyboard(language)
+            bot_text("help", language), reply_markup=menu_keyboard(language)
         )
     elif action == "search":
         if not is_allowed_user(user_id):
@@ -486,6 +496,14 @@ async def require_runtime_admin(message: Message) -> int | None:
     return user_id
 
 
+async def require_admin(message: Message) -> int | None:
+    user_id = get_user_id(message)
+    if user_id is None or not is_admin(user_id):
+        await message.answer(ADMIN_REQUIRED)
+        return None
+    return user_id
+
+
 @router.message(Command("allow"))
 async def allow_handler(message: Message, command: CommandObject) -> None:
     admin_id = await require_runtime_admin(message)
@@ -542,6 +560,95 @@ async def allowed_users_handler(message: Message) -> None:
     await message.answer(
         f"Static allowed users: {static_text}\nRuntime allowed users:\n{runtime_text}"
     )
+
+
+def parse_set_text_args(arguments: str | None) -> tuple[str, str, str]:
+    if not arguments:
+        raise BotTextValidationError("Usage: /set_text <key> <lang> <text>")
+    parts = arguments.strip().split(maxsplit=2)
+    if len(parts) != 3:
+        raise BotTextValidationError("Usage: /set_text <key> <lang> <text>")
+    return parts[0], parts[1], parts[2]
+
+
+def parse_text_target_args(
+    arguments: str | None, default_language: str | None = None
+) -> tuple[str, str | None]:
+    if not arguments:
+        raise BotTextValidationError("Text key is required")
+    parts = arguments.strip().split(maxsplit=1)
+    return parts[0], parts[1] if len(parts) == 2 else default_language
+
+
+@router.message(Command("texts"))
+async def texts_handler(message: Message) -> None:
+    if await require_admin(message) is None:
+        return
+    await message.answer(
+        "Editable text keys: welcome, help, about\nLanguages: en, fa\n"
+        "Use /set_text, /reset_text, and /preview_text."
+    )
+
+
+@router.message(Command("set_text"))
+async def set_text_handler(message: Message, command: CommandObject) -> None:
+    if await require_admin(message) is None:
+        return
+    settings = get_settings()
+    try:
+        key, language, value = parse_set_text_args(command.args)
+        set_bot_text(
+            Path(settings.bot_texts_path),
+            key,
+            language,
+            value,
+            settings.bot_text_max_length,
+        )
+    except BotTextValidationError as exc:
+        await message.answer(f"Error: {exc}")
+        return
+    await message.answer(f"Updated {key}/{language}.")
+
+
+@router.message(Command("reset_text"))
+async def reset_text_handler(message: Message, command: CommandObject) -> None:
+    if await require_admin(message) is None:
+        return
+    try:
+        key, language = parse_text_target_args(command.args)
+        changed = reset_bot_text(Path(get_settings().bot_texts_path), key, language)
+    except BotTextValidationError as exc:
+        await message.answer(f"Error: {exc}")
+        return
+    target = f"{key}/{language}" if language else key
+    await message.answer(
+        f"Reset {target} to default." if changed else f"No override found for {target}."
+    )
+
+
+@router.message(Command("preview_text"))
+async def preview_text_handler(message: Message, command: CommandObject) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    try:
+        key, language = parse_text_target_args(
+            command.args, default_language=get_language(admin_id)
+        )
+        if key not in EDITABLE_TEXT_KEYS or language not in {"en", "fa"}:
+            raise BotTextValidationError(
+                "Key must be welcome, help, or about; language must be en or fa"
+            )
+        preview = bot_text(
+            key,
+            language,
+            version=APP_VERSION,
+            runtime_target=RUNTIME_TARGET,
+        )
+    except BotTextValidationError as exc:
+        await message.answer(f"Error: {exc}")
+        return
+    await message.answer(f"Preview {key}/{language}:\n\n{preview}")
 
 
 @router.message(Command("admin_status"))

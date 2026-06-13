@@ -44,6 +44,10 @@ def test_admin_command_list_builder() -> None:
         "allow",
         "deny",
         "cleanup",
+        "texts",
+        "set_text",
+        "reset_text",
+        "preview_text",
     ]
 
 
@@ -83,7 +87,7 @@ def test_registration_includes_default_localized_and_admin_scopes() -> None:
     assert bot.calls[1]["language_code"] == "fa"
     admin_calls = bot.calls[2:]
     assert {call["scope"].chat_id for call in admin_calls} == {123, 456}
-    assert all(len(call["commands"]) == 13 for call in admin_calls)
+    assert all(len(call["commands"]) == 17 for call in admin_calls)
 
 
 def test_disabled_registration_makes_no_api_calls() -> None:

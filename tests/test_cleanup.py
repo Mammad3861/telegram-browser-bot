@@ -42,6 +42,8 @@ def test_cleanup_never_touches_sessions_or_access(tmp_path) -> None:
     protected_files = [
         tmp_path / "sessions" / "123" / "example.com.json",
         tmp_path / "access" / "allowed_users.json",
+        tmp_path / "preferences" / "user_preferences.json",
+        tmp_path / "texts" / "bot_texts.json",
     ]
     for path in protected_files:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -52,4 +54,3 @@ def test_cleanup_never_touches_sessions_or_access(tmp_path) -> None:
 
     assert all(path.exists() for path in protected_files)
     assert result.deleted_files == 0
-
