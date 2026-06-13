@@ -11,7 +11,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "menu": "Choose an option or send a single http/https URL.",
         "help": (
             "Send a URL to open an action card, use /menu, or change language with "
-            "/language.\n"
+            "/language. Search the web with /search.\n"
             "Advanced slash commands such as /fetch, /links, /html, /screenshot, "
             "and /pdf are still available."
         ),
@@ -29,7 +29,16 @@ TEXTS: dict[str, dict[str, str]] = {
             "Interactive web export and browser automation for Telegram.\n"
             "Official runtime: {runtime_target}"
         ),
-        "search_planned": "Search is planned for a future version.",
+        "search_help": "Use /search your query to search the web.",
+        "search_usage": "Usage: /search your query",
+        "search_query_too_long": "Search query must be at most {max_length} characters.",
+        "search_unavailable": "Search is temporarily unavailable. Please try again later.",
+        "search_no_results": "No safe search results were found.",
+        "search_results": "🔎 Results for: {query}",
+        "search_expired": "This search session expired. Please search again.",
+        "search_not_owned": "This search session belongs to another user.",
+        "search_opening": "Opening result...",
+        "search_closed": "Search results closed.",
         "url_card": "URL action card\n\n{url}\n\nChoose an action:",
         "url_refreshed": "URL action card refreshed.\n\n{url}\n\nChoose an action:",
         "url_cancelled": "URL session cancelled.",
@@ -48,7 +57,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "welcome": "ربات مرورگر تلگرام آماده است. برای شروع از /menu استفاده کنید.",
         "menu": "یک گزینه را انتخاب کنید یا یک نشانی http/https بفرستید.",
         "help": (
-            "یک نشانی بفرستید تا کارت عملیات ساخته شود، از /menu استفاده کنید، یا زبان را با /language تغییر دهید.\n"
+            "یک نشانی بفرستید تا کارت عملیات ساخته شود، از /menu استفاده کنید، زبان را با /language تغییر دهید، یا با /search جست‌وجو کنید.\n"
             "دستورهای پیشرفته مانند /fetch، /links، /html، /screenshot و /pdf همچنان فعال هستند."
         ),
         "open_url": "یک نشانی http/https بفرستید تا کارت عملیات ساخته شود.",
@@ -65,7 +74,16 @@ TEXTS: dict[str, dict[str, str]] = {
             "ابزار تعاملی خروجی وب و مرورگر برای تلگرام.\n"
             "محیط رسمی: {runtime_target}"
         ),
-        "search_planned": "جست‌وجوی وب برای نسخه آینده برنامه‌ریزی شده است.",
+        "search_help": "برای جست‌وجوی وب از /search عبارت موردنظر استفاده کنید.",
+        "search_usage": "روش استفاده: /search عبارت جست‌وجو",
+        "search_query_too_long": "عبارت جست‌وجو باید حداکثر {max_length} نویسه باشد.",
+        "search_unavailable": "جست‌وجو موقتاً در دسترس نیست. بعداً دوباره تلاش کنید.",
+        "search_no_results": "نتیجه امنی برای جست‌وجو پیدا نشد.",
+        "search_results": "🔎 نتایج برای: {query}",
+        "search_expired": "نشست جست‌وجو منقضی شده است. دوباره جست‌وجو کنید.",
+        "search_not_owned": "این نشست جست‌وجو متعلق به کاربر دیگری است.",
+        "search_opening": "در حال باز کردن نتیجه...",
+        "search_closed": "نتایج جست‌وجو بسته شد.",
         "url_card": "کارت عملیات نشانی\n\n{url}\n\nیک عملیات را انتخاب کنید:",
         "url_refreshed": "کارت عملیات تازه‌سازی شد.\n\n{url}\n\nیک عملیات را انتخاب کنید:",
         "url_cancelled": "نشست این نشانی لغو شد.",

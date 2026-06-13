@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     delete_generated_files_after_send: bool = True
     url_session_ttl_minutes: int = 60
     register_bot_commands: bool = True
+    search_provider: str = "duckduckgo_html"
+    search_results_limit: int = 5
+    search_timeout_seconds: float = 15.0
+    search_query_max_length: int = 200
+    search_session_ttl_minutes: int = 30
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

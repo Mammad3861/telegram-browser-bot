@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.2.0-alpha.1] - 2026-06-14
+
+### Added
+
+- Protected `/search <query>` command with English and Persian messages.
+- DuckDuckGo HTML provider behind a replaceable search-provider abstraction.
+- Interactive search result cards with numbered result buttons, refresh, and close actions.
+- Owner-bound, expiring in-memory search sessions using compact callback data.
+- Safe result URL filtering through existing SSRF validation before opening URL cards.
+- Search provider, timeout, result limit, query length, and session TTL settings.
+
+### Safety
+
+- Search failures return a generic safe message without stack traces or query logging.
+- Google is not scraped, and no search-engine anti-bot bypass is implemented.
+
 ## [v1.1.1-alpha.1] - 2026-06-13
 
 ### Added

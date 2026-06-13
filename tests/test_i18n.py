@@ -35,3 +35,9 @@ def test_missing_persian_key_falls_back_to_english(monkeypatch) -> None:
 
     assert text("help", "fa") == TEXTS["en"]["help"]
 
+
+def test_search_messages_exist_and_fallback_to_english(monkeypatch) -> None:
+    assert "/search" in text("search_usage", "en")
+    assert text("search_unavailable", "fa") == TEXTS["fa"]["search_unavailable"]
+    monkeypatch.delitem(TEXTS["fa"], "search_expired")
+    assert text("search_expired", "fa") == TEXTS["en"]["search_expired"]

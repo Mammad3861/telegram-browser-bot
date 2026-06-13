@@ -25,6 +25,7 @@ def test_default_command_list_builder() -> None:
     assert [command.command for command in commands] == [
         "start",
         "menu",
+        "search",
         "help",
         "language",
         "about",
@@ -82,7 +83,7 @@ def test_registration_includes_default_localized_and_admin_scopes() -> None:
     assert bot.calls[1]["language_code"] == "fa"
     admin_calls = bot.calls[2:]
     assert {call["scope"].chat_id for call in admin_calls} == {123, 456}
-    assert all(len(call["commands"]) == 12 for call in admin_calls)
+    assert all(len(call["commands"]) == 13 for call in admin_calls)
 
 
 def test_disabled_registration_makes_no_api_calls() -> None:
@@ -102,4 +103,3 @@ def test_registration_failure_is_non_fatal() -> None:
     result = asyncio.run(register_bot_commands(bot, settings))  # type: ignore[arg-type]
 
     assert result is False
-

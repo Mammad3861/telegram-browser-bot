@@ -14,6 +14,7 @@ def build_default_commands(language: str = "en") -> list[BotCommand]:
         {
             "start": "شروع ربات",
             "menu": "باز کردن منوی اصلی",
+            "search": "جست‌وجوی وب",
             "help": "نمایش راهنما",
             "language": "تغییر زبان",
             "about": "درباره این ربات",
@@ -24,6 +25,7 @@ def build_default_commands(language: str = "en") -> list[BotCommand]:
         else {
             "start": "Start the bot",
             "menu": "Open interactive menu",
+            "search": "Search the web",
             "help": "Show help",
             "language": "Change language",
             "about": "About this bot",
@@ -94,4 +96,3 @@ async def register_bot_commands(bot: Bot, settings: Settings) -> bool:
 
     logger.info("Telegram bot commands registered")
     return True
-

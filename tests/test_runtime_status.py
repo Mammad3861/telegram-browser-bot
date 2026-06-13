@@ -35,7 +35,7 @@ def test_health_response_shape(tmp_path, monkeypatch) -> None:
         "browser_features_configured",
     }
     assert response["status"] == "ok"
-    assert response["version"] == "1.1.1-alpha.1"
+    assert response["version"] == "1.2.0-alpha.1"
     assert response["bot_configured"] is False
     assert response["cookie_import_enabled"] is False
 
@@ -56,7 +56,7 @@ def test_admin_status_helper(tmp_path) -> None:
 
     status = build_admin_status(settings, store)
 
-    assert status.version == "1.1.1-alpha.1"
+    assert status.version == "1.2.0-alpha.1"
     assert status.active_jobs == 1
     assert status.known_jobs == 2
     assert status.runtime_allowed_users == 1

@@ -8,13 +8,14 @@ A Telegram bot for fetching web pages, extracting links, exporting browser artif
 
 ## Version
 
-v1.1.1-alpha.1
+v1.2.0-alpha.1
 
 ## Features
 
 - Telegram bot commands include browser exports, downloads, jobs, and encrypted cookie session management.
 - Interactive Telegram menu and URL action cards with inline buttons
 - Native Telegram Menu button command registration with English/Persian descriptions
+- Basic DuckDuckGo HTML web search with interactive result cards
 - Basic in-memory English/Persian language preferences
 - Secure URL validation
 - Basic SSRF protection
@@ -81,6 +82,7 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 
 - `/start` - start the bot and show commands
 - `/menu` - open the interactive Telegram menu
+- `/search <query>` - search the web and open results as URL cards
 - `/language [en|fa]` - view or change your language preference
 - `/about` - show project version and supported runtime
 - `/help` - show short, friendly command help
@@ -131,6 +133,11 @@ CLEANUP_MAX_AGE_HOURS=24
 DELETE_GENERATED_FILES_AFTER_SEND=true
 URL_SESSION_TTL_MINUTES=60
 REGISTER_BOT_COMMANDS=true
+SEARCH_PROVIDER=duckduckgo_html
+SEARCH_RESULTS_LIMIT=5
+SEARCH_TIMEOUT_SECONDS=15
+SEARCH_QUERY_MAX_LENGTH=200
+SEARCH_SESSION_TTL_MINUTES=30
 ```
 
 Set `ENABLE_RUNTIME_ACCESS_MANAGEMENT=false` to disable `/allow`, `/deny`, and `/allowed_users`. Existing administrators cannot be removed with `/deny`. The `downloads/access` directory may contain real Telegram user IDs and must not be committed; the project ignores the entire `downloads/` directory.
@@ -166,6 +173,11 @@ CLEANUP_MAX_AGE_HOURS=24
 DELETE_GENERATED_FILES_AFTER_SEND=true
 URL_SESSION_TTL_MINUTES=60
 REGISTER_BOT_COMMANDS=true
+SEARCH_PROVIDER=duckduckgo_html
+SEARCH_RESULTS_LIMIT=5
+SEARCH_TIMEOUT_SECONDS=15
+SEARCH_QUERY_MAX_LENGTH=200
+SEARCH_SESSION_TTL_MINUTES=30
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
@@ -186,11 +198,19 @@ URL cards use short in-memory session IDs rather than full URLs in callback data
 
 ## Telegram Menu Button
 
-When the bot starts with a configured token, it registers a concise native Telegram command menu containing `/start`, `/menu`, `/help`, `/language`, `/about`, `/sessions`, and `/whoami`. Persian command descriptions are registered for Telegram clients using the `fa` language code.
+When the bot starts with a configured token, it registers a concise native Telegram command menu containing `/start`, `/menu`, `/search`, `/help`, `/language`, `/about`, `/sessions`, and `/whoami`. Persian command descriptions are registered for Telegram clients using the `fa` language code.
 
 Configured administrators receive a chat-scoped menu that also includes `/admin_status`, `/allowed_users`, `/allow`, `/deny`, and `/cleanup`. Advanced browser slash commands remain available without cluttering the native Menu button.
 
 Set `REGISTER_BOT_COMMANDS=false` to skip command registration. Registration errors are logged as warnings and do not prevent bot polling from starting.
+
+## Web Search
+
+`/search <query>` performs a basic alpha web search using `SEARCH_PROVIDER`, currently `duckduckgo_html`. Search is also available from the interactive menu and Telegram's native Menu button.
+
+Results appear in an inline card. Selecting a numbered result validates its URL and opens the existing URL action card. Invalid, localhost, private-IP, file, and script URLs are discarded before the search session is stored.
+
+Search sessions are owner-bound, in memory, expire after `SEARCH_SESSION_TTL_MINUTES`, and reset when the bot restarts. Provider failures return a generic safe error. The project does not scrape Google or bypass search-engine anti-bot systems. Set `SEARCH_PROVIDER=disabled` to disable provider-backed search.
 
 ## Background Jobs
 
@@ -292,15 +312,15 @@ Telegram polling makes outbound connections, so ports 80 and 443 do not need to 
 Alpha releases are created automatically when a version tag matching `v*` is pushed. The release workflow runs the test suite before creating the GitHub Release and uses `CHANGELOG.md` for release notes.
 
 ```bash
-git tag v1.1.1-alpha.1
-git push origin v1.1.1-alpha.1
+git tag v1.2.0-alpha.1
+git push origin v1.2.0-alpha.1
 ```
 
 GitHub provides the generated source archives. Docker images are validated in CI but are not published.
 
 ## Post-v1 Roadmap
 
-- Real web search
+- Additional search providers and richer result presentation
 - Admin-editable bot texts, descriptions, and help messages
 - Per-language editable welcome, help, and about texts
 - Persistent user language preferences

@@ -73,6 +73,23 @@ from app.fetchers.file_downloader import DownloadError, FileDownloader
 from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
 from app.version import APP_VERSION
+from app.search.providers import SearchResult, search_web
+from app.search.service import (
+    SearchQueryError,
+    filter_safe_search_results,
+    validate_search_query,
+)
+from app.search.sessions import (
+    SearchSessionExpired,
+    SearchSessionNotFound,
+    SearchSessionNotOwned,
+    search_session_store,
+)
+from app.search.ui import (
+    format_search_results,
+    parse_search_callback_data,
+    search_results_keyboard,
+)
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -183,7 +200,143 @@ async def menu_callback_handler(callback: CallbackQuery) -> None:
             text("help", language), reply_markup=menu_keyboard(language)
         )
     elif action == "search":
-        await callback.message.answer(text("search_planned", language))
+        if not is_allowed_user(user_id):
+            await callback.message.answer(text("access_denied", language))
+            return
+        await callback.message.answer(text("search_help", language))
+
+
+async def perform_search(query: str) -> list[SearchResult]:
+    settings = get_settings()
+    limit = max(1, min(settings.search_results_limit, 5))
+    results = await search_web(
+        settings.search_provider,
+        query,
+        limit,
+        settings.search_timeout_seconds,
+    )
+    return filter_safe_search_results(results, limit)
+
+
+async def send_search_results(
+    message: Message, user_id: int, query: str, language: str
+) -> None:
+    results = await perform_search(query)
+    if not results:
+        await message.answer(text("search_no_results", language))
+        return
+    session = search_session_store.create(user_id, query, results)
+    await message.answer(
+        format_search_results(
+            query, results, text("search_results", language, query=query)
+        ),
+        reply_markup=search_results_keyboard(
+            session.session_id, len(results), language
+        ),
+    )
+
+
+@router.message(Command("search"))
+async def search_handler(message: Message, command: CommandObject) -> None:
+    if await reject_unless_allowed(message):
+        return
+    user_id = get_user_id(message)
+    language = get_language(user_id)
+    if user_id is None:
+        await message.answer(text("search_unavailable", language))
+        return
+    settings = get_settings()
+    try:
+        query = validate_search_query(command.args, settings.search_query_max_length)
+    except SearchQueryError:
+        if command.args and command.args.strip():
+            await message.answer(
+                text(
+                    "search_query_too_long",
+                    language,
+                    max_length=settings.search_query_max_length,
+                )
+            )
+        else:
+            await message.answer(text("search_usage", language))
+        return
+    try:
+        await send_search_results(message, user_id, query, language)
+    except Exception as exc:
+        logger.warning("Search failed: exception_type=%s", type(exc).__name__)
+        await message.answer(text("search_unavailable", language))
+
+
+@router.callback_query(F.data.startswith("search:"))
+async def search_callback_handler(callback: CallbackQuery) -> None:
+    parsed = parse_search_callback_data(callback.data)
+    if parsed is None:
+        await callback.answer("Invalid action", show_alert=True)
+        return
+    user_id = callback.from_user.id
+    language = get_language(user_id)
+    if not is_allowed_user(user_id):
+        await callback.answer(text("access_denied", language), show_alert=True)
+        return
+    try:
+        session = search_session_store.get_for_user(
+            parsed.session_id,
+            user_id,
+            get_settings().search_session_ttl_minutes,
+        )
+    except (SearchSessionNotFound, SearchSessionExpired):
+        await callback.answer(text("search_expired", language), show_alert=True)
+        return
+    except SearchSessionNotOwned:
+        await callback.answer(text("search_not_owned", language), show_alert=True)
+        return
+
+    message = callback.message
+    if message is None:
+        await callback.answer()
+        return
+    if parsed.action == "close":
+        search_session_store.cancel(session.session_id, user_id)
+        await callback.answer()
+        await message.edit_text(text("search_closed", language))
+        return
+    if parsed.action == "open":
+        if parsed.index is None or parsed.index >= len(session.results):
+            await callback.answer(text("search_expired", language), show_alert=True)
+            return
+        result = session.results[parsed.index]
+        try:
+            url = validate_url(result.url)
+        except URLValidationError:
+            await callback.answer(text("invalid_url", language), show_alert=True)
+            return
+        await callback.answer(text("search_opening", language))
+        await create_url_card(message, user_id, url)
+        return
+
+    await callback.answer()
+    try:
+        results = await perform_search(session.query)
+        if not results:
+            await message.answer(text("search_no_results", language))
+            return
+        updated = search_session_store.update_results(session.session_id, results)
+        if updated is None:
+            await message.answer(text("search_expired", language))
+            return
+        await message.edit_text(
+            format_search_results(
+                updated.query,
+                updated.results,
+                text("search_results", language, query=updated.query),
+            ),
+            reply_markup=search_results_keyboard(
+                updated.session_id, len(updated.results), language
+            ),
+        )
+    except Exception as exc:
+        logger.warning("Search refresh failed: exception_type=%s", type(exc).__name__)
+        await message.answer(text("search_unavailable", language))
 
 
 async def create_url_card(message: Message, user_id: int, url: str) -> None:
