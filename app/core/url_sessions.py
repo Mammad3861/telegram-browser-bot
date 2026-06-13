@@ -1,7 +1,15 @@
+import json
+import logging
 import secrets
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from threading import RLock
+
+from app.config import get_settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class URLSessionError(RuntimeError):
@@ -31,13 +39,69 @@ class URLSession:
 
 
 class URLSessionStore:
-    def __init__(self) -> None:
+    def __init__(self, path: Path | None = None, max_stored: int = 500) -> None:
         self._sessions: dict[str, URLSession] = {}
         self._lock = RLock()
+        self.path = path
+        self.max_stored = max_stored
+        self._load()
+
+    def _load(self) -> None:
+        if self.path is None or not self.path.exists():
+            return
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "Could not load URL sessions; using empty store: exception_type=%s",
+                type(exc).__name__,
+            )
+            return
+        raw_sessions = payload.get("sessions", []) if isinstance(payload, dict) else []
+        for item in raw_sessions:
+            if not isinstance(item, dict):
+                continue
+            try:
+                session = URLSession(
+                    session_id=str(item["session_id"]),
+                    user_id=int(item["user_id"]),
+                    url=str(item["url"]),
+                    created_at=datetime.fromisoformat(str(item["created_at"])),
+                    cancelled=bool(item.get("cancelled", False)),
+                    last_message_id=(
+                        int(item["last_message_id"])
+                        if item.get("last_message_id") is not None
+                        else None
+                    ),
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+            self._sessions[session.session_id] = session
+
+    def _save(self) -> None:
+        if self.path is None:
+            return
+        sessions = sorted(
+            self._sessions.values(), key=lambda item: item.created_at, reverse=True
+        )[: self.max_stored]
+        self._sessions = {item.session_id: item for item in sessions}
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
+        payload = {
+            "sessions": [
+                {**asdict(item), "created_at": item.created_at.isoformat()}
+                for item in sessions
+            ]
+        }
+        temporary.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        temporary.replace(self.path)
 
     def clear(self) -> None:
         with self._lock:
             self._sessions.clear()
+            self._save()
 
     def create(self, user_id: int, url: str, now: datetime | None = None) -> URLSession:
         with self._lock:
@@ -49,6 +113,7 @@ class URLSessionStore:
                 created_at=now or datetime.now(UTC),
             )
             self._sessions[session_id] = session
+            self._save()
             return session
 
     def _new_id(self) -> str:
@@ -75,6 +140,7 @@ class URLSessionStore:
             current_time = now or datetime.now(UTC)
             if current_time - session.created_at >= timedelta(minutes=ttl_minutes):
                 self._sessions.pop(session_id, None)
+                self._save()
                 raise URLSessionExpired("URL session expired")
             return session
 
@@ -91,6 +157,7 @@ class URLSessionStore:
                 last_message_id=message_id or session.last_message_id,
             )
             self._sessions[session_id] = updated
+            self._save()
             return updated
 
     def cancel(self, session_id: str, user_id: int) -> bool:
@@ -99,10 +166,14 @@ class URLSessionStore:
             if session is None or session.user_id != user_id or session.cancelled:
                 return False
             self._sessions[session_id] = replace(session, cancelled=True)
+            self._save()
             return True
 
     def remove(self, session_id: str, user_id: int) -> bool:
         return self.cancel(session_id, user_id)
 
 
-url_session_store = URLSessionStore()
+_settings = get_settings()
+url_session_store = URLSessionStore(
+    Path(_settings.url_sessions_path), _settings.url_session_max_stored
+)

@@ -26,7 +26,14 @@ from app.core.bot_text_store import (
     set_bot_text,
 )
 from app.core.encryption import EncryptionError
-from app.core.jobs import Job, JobLimitError, job_store
+from app.core.job_history import (
+    JobHistoryEntry,
+    find_job_history,
+    list_user_job_history,
+    load_job_history,
+    purge_job_history,
+)
+from app.core.jobs import Job, JobLimitError, JobStore, job_store
 from app.core.session_store import (
     delete_session,
     list_sessions,
@@ -736,6 +743,20 @@ async def cleanup_handler(message: Message) -> None:
     )
 
 
+@router.message(Command("purge_history"))
+async def purge_history_handler(message: Message) -> None:
+    user_id = get_user_id(message)
+    if user_id is None or not is_admin(user_id):
+        await message.answer(ADMIN_REQUIRED)
+        return
+    try:
+        purged = purge_job_history(Path(get_settings().job_history_path))
+    except OSError:
+        await message.answer("Job history could not be cleared.")
+        return
+    await message.answer(f"Job history cleared. Removed entries: {purged}")
+
+
 @router.message(Command("cookies_help"))
 async def cookies_help_handler(message: Message) -> None:
     if await reject_unless_allowed(message):
@@ -1273,6 +1294,54 @@ def format_job(job: Job) -> str:
     return "\n".join(details)
 
 
+def format_job_history(job: JobHistoryEntry) -> str:
+    details = [
+        f"Job ID: {job.job_id}",
+        f"Command: /{job.command}",
+        f"Status: {job.status}",
+    ]
+    if job.url_domain:
+        details.append(f"Domain: {job.url_domain}")
+    if job.error_message:
+        details.append(f"Error: {job.error_message}")
+    return "\n".join(details)
+
+
+def get_job_status_record(
+    job_id: str,
+    user_id: int,
+    is_admin_user: bool,
+    store: JobStore,
+    history_path: Path,
+) -> Job | JobHistoryEntry | None:
+    active_job = store.get_job(job_id)
+    if active_job is not None:
+        return active_job if is_admin_user or active_job.user_id == user_id else None
+    history_job = find_job_history(history_path, job_id)
+    if history_job is None:
+        return None
+    return history_job if is_admin_user or history_job.user_id == user_id else None
+
+
+def list_job_records(
+    user_id: int,
+    is_admin_user: bool,
+    store: JobStore,
+    history_path: Path,
+) -> list[Job | JobHistoryEntry]:
+    active_jobs = store.list_jobs() if is_admin_user else store.list_user_jobs(user_id)
+    history_jobs = (
+        load_job_history(history_path)
+        if is_admin_user
+        else list_user_job_history(history_path, user_id)
+    )
+    active_ids = {job.id for job in active_jobs}
+    combined: list[Job | JobHistoryEntry] = active_jobs + [
+        job for job in history_jobs if job.job_id not in active_ids
+    ]
+    return sorted(combined, key=lambda job: job.created_at, reverse=True)
+
+
 @router.message(Command("status"))
 async def status_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
@@ -1281,11 +1350,22 @@ async def status_handler(message: Message, command: CommandObject) -> None:
         await message.answer("Usage: /status <job_id>")
         return
     user_id = get_user_id(message)
-    job = job_store.get_job(command.args.strip())
-    if job is None or user_id is None or (job.user_id != user_id and not is_admin(user_id)):
+    if user_id is None:
         await message.answer("Job not found.")
         return
-    await message.answer(format_job(job))
+    job = get_job_status_record(
+        command.args.strip(),
+        user_id,
+        is_admin(user_id),
+        job_store,
+        Path(get_settings().job_history_path),
+    )
+    if job is None:
+        await message.answer("Job not found.")
+        return
+    await message.answer(
+        format_job(job) if isinstance(job, Job) else format_job_history(job)
+    )
 
 
 @router.message(Command("jobs"))
@@ -1296,11 +1376,21 @@ async def jobs_handler(message: Message) -> None:
     if user_id is None:
         await message.answer("No jobs found.")
         return
-    jobs = job_store.list_jobs() if is_admin(user_id) else job_store.list_user_jobs(user_id)
+    jobs = list_job_records(
+        user_id,
+        is_admin(user_id),
+        job_store,
+        Path(get_settings().job_history_path),
+    )
     if not jobs:
         await message.answer("No jobs found.")
         return
-    await message.answer("\n\n".join(format_job(job) for job in jobs[:10]))
+    await message.answer(
+        "\n\n".join(
+            format_job(job) if isinstance(job, Job) else format_job_history(job)
+            for job in jobs[:10]
+        )
+    )
 
 
 @router.message(Command("cancel"))

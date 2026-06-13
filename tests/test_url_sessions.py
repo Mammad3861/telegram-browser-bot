@@ -78,3 +78,35 @@ def test_user_cannot_cancel_another_users_session() -> None:
 
     assert not store.cancel(session.session_id, 456)
     assert store.get_for_user(session.session_id, 123, ttl_minutes=60, now=NOW) == session
+
+
+def test_url_session_persists_across_store_reload(tmp_path) -> None:
+    path = tmp_path / "ui_sessions" / "url_sessions.json"
+    session = URLSessionStore(path).create(123, "https://example.com", now=NOW)
+
+    loaded = URLSessionStore(path).get_for_user(
+        session.session_id, 123, ttl_minutes=60, now=NOW
+    )
+
+    assert loaded == session
+
+
+def test_loaded_expired_url_session_is_rejected(tmp_path) -> None:
+    path = tmp_path / "url_sessions.json"
+    session = URLSessionStore(path).create(123, "https://example.com", now=NOW)
+
+    with pytest.raises(URLSessionExpired):
+        URLSessionStore(path).get_for_user(
+            session.session_id,
+            123,
+            ttl_minutes=60,
+            now=NOW + timedelta(minutes=60),
+        )
+
+
+def test_corrupted_url_session_json_falls_back_to_empty_store(tmp_path) -> None:
+    path = tmp_path / "url_sessions.json"
+    path.write_text("{broken", encoding="utf-8")
+
+    with pytest.raises(URLSessionNotFound):
+        URLSessionStore(path).get_for_user("missing", 123, ttl_minutes=60, now=NOW)

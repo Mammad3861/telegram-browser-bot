@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.4.0-alpha.1] - 2026-06-14
+
+### Added
+
+- Atomic local persistence for owner-bound URL and search UI sessions.
+- Safe completed-job history containing URL domains instead of full URLs.
+- `/jobs` and `/status` fallback to persisted completed-job summaries after restart.
+- Admin-only `/purge_history` command for completed history.
+- Configurable storage paths and retention limits for UI sessions and job history.
+
+### Reliability
+
+- Corrupted UI-session or job-history JSON logs a safe warning and falls back to an empty store.
+- Cleanup continues to preserve sessions, access, preferences, texts, UI sessions, and job history.
+- Active jobs remain in memory; no database or Redis has been added.
+
 ## [v1.3.0-alpha.1] - 2026-06-14
 
 ### Added

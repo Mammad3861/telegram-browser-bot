@@ -1,9 +1,17 @@
 import asyncio
+import logging
 import secrets
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from pathlib import Path
 from threading import RLock
 from typing import Literal
+
+from app.config import get_settings
+from app.core.job_history import add_job_history_entry, history_entry_from_job
+
+
+logger = logging.getLogger(__name__)
 
 
 JobStatus = Literal["pending", "running", "success", "failed", "cancelled"]
@@ -34,10 +42,14 @@ class Job:
 
 
 class JobStore:
-    def __init__(self) -> None:
+    def __init__(
+        self, history_path: Path | None = None, history_max_stored: int = 1000
+    ) -> None:
         self._jobs: dict[str, Job] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._lock = RLock()
+        self.history_path = history_path
+        self.history_max_stored = history_max_stored
 
     def clear(self) -> None:
         with self._lock:
@@ -106,6 +118,23 @@ class JobStore:
 
             updated = replace(job, **changes)
             self._jobs[job_id] = updated
+            if (
+                self.history_path is not None
+                and updated.status in {"success", "failed", "cancelled"}
+            ):
+                try:
+                    add_job_history_entry(
+                        self.history_path,
+                        history_entry_from_job(updated),
+                        self.history_max_stored,
+                    )
+                except OSError as exc:
+                    logger.warning(
+                        "Could not persist completed job history: job_id=%s "
+                        "exception_type=%s",
+                        updated.id,
+                        type(exc).__name__,
+                    )
             return updated
 
     def list_user_jobs(self, user_id: int) -> list[Job]:
@@ -142,7 +171,10 @@ class JobStore:
             return True
 
 
-job_store = JobStore()
+_settings = get_settings()
+job_store = JobStore(
+    Path(_settings.job_history_path), _settings.job_history_max_stored
+)
 
 
 def create_job(*args, **kwargs) -> Job:

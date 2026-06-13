@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml)
 
-> v1.1 alpha. This project is ready for controlled early testing, not unrestricted public deployment.
+> v1.4 alpha. This project is ready for controlled early testing, not unrestricted public deployment.
 
 A Telegram bot for fetching web pages, extracting links, exporting browser artifacts, downloading direct files, and using encrypted per-user browser sessions.
 
 ## Version
 
-v1.3.0-alpha.1
+v1.4.0-alpha.1
 
 ## Features
 
@@ -27,7 +27,7 @@ v1.3.0-alpha.1
 - HTML export as `.html` or `.html.gz`
 - Playwright-rendered HTML export after JavaScript execution
 - Streaming direct-file downloads with SHA256 metadata
-- In-memory background jobs with global and per-user concurrency limits
+- In-memory active jobs with persistent completed-job history
 - Playwright Chromium full-page PNG screenshots
 - Playwright Chromium PDF export with background graphics
 - Encrypted per-user, per-domain Playwright cookie sessions
@@ -105,6 +105,7 @@ The API health check is available at `http://127.0.0.1:8000/health`. Telegram po
 - `/allowed_users` - list static and runtime allowed users (admin only)
 - `/admin_status` - show safe application and storage diagnostics (admin only)
 - `/cleanup` - delete generated files older than the configured retention period (admin only)
+- `/purge_history` - clear persisted completed-job history (admin only)
 - `/texts` - list editable bot text keys (admin only)
 - `/set_text <key> <lang> <text>` - set an editable bot text (admin only)
 - `/reset_text <key> [lang]` - reset an editable text to default (admin only)
@@ -146,6 +147,12 @@ SEARCH_SESSION_TTL_MINUTES=30
 USER_PREFERENCES_PATH=downloads/preferences/user_preferences.json
 BOT_TEXTS_PATH=downloads/texts/bot_texts.json
 BOT_TEXT_MAX_LENGTH=3000
+URL_SESSIONS_PATH=downloads/ui_sessions/url_sessions.json
+URL_SESSION_MAX_STORED=500
+SEARCH_SESSIONS_PATH=downloads/ui_sessions/search_sessions.json
+SEARCH_SESSION_MAX_STORED=300
+JOB_HISTORY_PATH=downloads/jobs/job_history.json
+JOB_HISTORY_MAX_STORED=1000
 ```
 
 Set `ENABLE_RUNTIME_ACCESS_MANAGEMENT=false` to disable `/allow`, `/deny`, and `/allowed_users`. Existing administrators cannot be removed with `/deny`. The `downloads/access` directory may contain real Telegram user IDs and must not be committed; the project ignores the entire `downloads/` directory.
@@ -189,13 +196,19 @@ SEARCH_SESSION_TTL_MINUTES=30
 USER_PREFERENCES_PATH=downloads/preferences/user_preferences.json
 BOT_TEXTS_PATH=downloads/texts/bot_texts.json
 BOT_TEXT_MAX_LENGTH=3000
+URL_SESSIONS_PATH=downloads/ui_sessions/url_sessions.json
+URL_SESSION_MAX_STORED=500
+SEARCH_SESSIONS_PATH=downloads/ui_sessions/search_sessions.json
+SEARCH_SESSION_MAX_STORED=300
+JOB_HISTORY_PATH=downloads/jobs/job_history.json
+JOB_HISTORY_MAX_STORED=1000
 ```
 
 Direct downloads are streamed into `DOWNLOADS_DIR/files` and never loaded fully into RAM. The declared `Content-Length` and actual streamed byte count are both checked against `MAX_DOWNLOAD_SIZE_MB`. Files above `TELEGRAM_MAX_UPLOAD_SIZE_MB` remain saved locally and are not uploaded to Telegram.
 
 Direct downloads support direct file URLs only. They do not scrape HTML pages to discover download links. The per-user daily quota is stored in memory and resets when the bot process restarts.
 
-`/cleanup` removes files older than `CLEANUP_MAX_AGE_HOURS` only from `html`, `html_rendered`, `files`, `screenshots`, and `pdf`. It never removes runtime access data or encrypted sessions.
+`/cleanup` removes files older than `CLEANUP_MAX_AGE_HOURS` only from `html`, `html_rendered`, `files`, `screenshots`, and `pdf`. It never removes runtime access data, encrypted sessions, preferences, editable texts, UI sessions, or job history.
 
 Generated files are deleted automatically after a successful Telegram upload by default. Persistent data under `downloads/sessions` and `downloads/access` is never removed by this behavior. Set `DELETE_GENERATED_FILES_AFTER_SEND=false` to retain generated output for debugging. Administrators can still run `/cleanup` to remove old leftovers.
 
@@ -203,7 +216,7 @@ Generated files are deleted automatically after a successful Telegram upload by 
 
 Allowed users can send a single public `http://` or `https://` URL as a plain message. The bot validates it and returns an action card without fetching the page automatically. Inline buttons provide Screenshot, PDF, HTML, Rendered HTML, Links, Download, Refresh, and Cancel actions.
 
-URL cards use short in-memory session IDs rather than full URLs in callback data. Sessions belong to their creator, expire after `URL_SESSION_TTL_MINUTES`, and reset when the process restarts. Refresh extends the card lifetime without fetching the URL.
+URL cards use short session IDs rather than full URLs in callback data. Sessions belong to their creator, expire after `URL_SESSION_TTL_MINUTES`, and are stored atomically in `downloads/ui_sessions/url_sessions.json`, so valid buttons continue working after a restart. Refresh extends the card lifetime without fetching the URL.
 
 `/language en` and `/language fa` select the English or Persian interface. Persian support is currently basic and focuses on the menu, help, URL cards, and common messages. Language preferences are stored in `downloads/preferences/user_preferences.json` and survive restarts.
 
@@ -227,13 +240,13 @@ Set `REGISTER_BOT_COMMANDS=false` to skip command registration. Registration err
 
 Results appear in an inline card. Selecting a numbered result validates its URL and opens the existing URL action card. Invalid, localhost, private-IP, file, and script URLs are discarded before the search session is stored.
 
-Search sessions are owner-bound, in memory, expire after `SEARCH_SESSION_TTL_MINUTES`, and reset when the bot restarts. Provider failures return a generic safe error. The project does not scrape Google or bypass search-engine anti-bot systems. Set `SEARCH_PROVIDER=disabled` to disable provider-backed search.
+Search sessions are owner-bound, expire after `SEARCH_SESSION_TTL_MINUTES`, and are stored atomically in `downloads/ui_sessions/search_sessions.json`. Valid result buttons continue working after a restart, and result URLs are revalidated before opening URL cards. Provider failures return a generic safe error. The project does not scrape Google or bypass search-engine anti-bot systems. Set `SEARCH_PROVIDER=disabled` to disable provider-backed search.
 
 ## Background Jobs
 
 `/html`, `/html_rendered`, `/download`, `/screenshot`, and `/pdf` run as background jobs. The bot immediately returns a short job ID, and `/status`, `/jobs`, and `/cancel` can be used to manage the work. Users can only view and cancel their own jobs; admins can manage any job.
 
-Jobs are stored in memory in v0.9 and reset whenever the bot process restarts. Redis, Celery, and database persistence are not included yet.
+Active jobs remain in memory and cannot resume after a process restart. Safe summaries of completed jobs are stored in `downloads/jobs/job_history.json`, allowing `/jobs` and `/status` to show recent history after restart. Only the URL domain is stored, not the full URL, generated output, cookies, or HTML. Administrators can clear completed history with `/purge_history`; active jobs are unaffected. Redis, Celery, and database persistence are not included yet.
 
 ## Cookie Sessions
 
@@ -320,7 +333,7 @@ curl http://127.0.0.1:18080/health
 docker compose down
 ```
 
-The `./downloads:/app/downloads` mount persists generated files, runtime access data, encrypted sessions, language preferences, and editable bot texts across container replacement. `downloads/preferences` and `downloads/texts` survive rebuilds and restarts and must not be committed.
+The `./downloads:/app/downloads` mount persists generated files, runtime access data, encrypted sessions, language preferences, editable bot texts, UI sessions, and completed-job history across container replacement. These local stores survive rebuilds and restarts and must not be committed.
 
 Telegram polling makes outbound connections, so ports 80 and 443 do not need to be exposed. Port `8000` is published as `127.0.0.1:18080` only for local health checks. If `TELEGRAM_BOT_TOKEN` is missing, the API and health endpoint still start while polling remains disabled. If `COOKIE_ENCRYPTION_KEY` is missing, cookie import is disabled while other features continue to work.
 
@@ -329,8 +342,8 @@ Telegram polling makes outbound connections, so ports 80 and 443 do not need to 
 Alpha releases are created automatically when a version tag matching `v*` is pushed. The release workflow runs the test suite before creating the GitHub Release and uses `CHANGELOG.md` for release notes.
 
 ```bash
-git tag v1.3.0-alpha.1
-git push origin v1.3.0-alpha.1
+git tag v1.4.0-alpha.1
+git push origin v1.4.0-alpha.1
 ```
 
 GitHub provides the generated source archives. Docker images are validated in CI but are not published.

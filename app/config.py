@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     user_preferences_path: str = "downloads/preferences/user_preferences.json"
     bot_texts_path: str = "downloads/texts/bot_texts.json"
     bot_text_max_length: int = 3000
+    url_sessions_path: str = "downloads/ui_sessions/url_sessions.json"
+    url_session_max_stored: int = 500
+    search_sessions_path: str = "downloads/ui_sessions/search_sessions.json"
+    search_session_max_stored: int = 300
+    job_history_path: str = "downloads/jobs/job_history.json"
+    job_history_max_stored: int = 1000
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
