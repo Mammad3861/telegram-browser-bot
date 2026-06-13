@@ -1,5 +1,7 @@
 # Telegram Browser Bot
 
+[![CI](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml)
+
 > v1.0 alpha. This project is ready for controlled early testing, not unrestricted public deployment.
 
 A Telegram bot for fetching web pages, extracting links, exporting browser artifacts, downloading direct files, and using encrypted per-user browser sessions.
@@ -254,6 +256,17 @@ docker compose down
 The `./downloads:/app/downloads` mount persists generated files, runtime access data, and encrypted sessions across container replacement. Do not commit this directory.
 
 Telegram polling makes outbound connections, so ports 80 and 443 do not need to be exposed. Port `8000` is published as `127.0.0.1:18080` only for local health checks. If `TELEGRAM_BOT_TOKEN` is missing, the API and health endpoint still start while polling remains disabled. If `COOKIE_ENCRYPTION_KEY` is missing, cookie import is disabled while other features continue to work.
+
+## Releases
+
+Alpha releases are created automatically when a version tag matching `v*` is pushed. The release workflow runs the test suite before creating the GitHub Release and uses `CHANGELOG.md` for release notes.
+
+```bash
+git tag v1.0.0-alpha.1
+git push origin v1.0.0-alpha.1
+```
+
+GitHub provides the generated source archives. Docker images are validated in CI but are not published.
 
 ## Post-v1 Roadmap
 
