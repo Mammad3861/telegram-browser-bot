@@ -57,6 +57,21 @@ TEXTS: dict[str, dict[str, str]] = {
         "job_started": "Job ID: {job_id}\nStatus: {status}",
         "no_links": "No links found.",
         "request_failed": "Request failed: {error}",
+        "admin_required": "Admin access required.",
+        "texts_overview": (
+            "Editable text keys: welcome, help, about\nLanguages: en, fa\n"
+            "Use /set_text, /reset_text, and /preview_text."
+        ),
+        "text_updated": "Updated {key}/{language}.",
+        "text_reset": "Reset {target} to default.",
+        "text_override_missing": "No override found for {target}.",
+        "text_preview": "Preview {key}/{language}:\n\n{preview}",
+        "text_invalid_key": "Invalid text key. Use welcome, help, or about.",
+        "text_invalid_language": "Invalid language. Use en or fa.",
+        "text_too_long": "Text is too long. Maximum length is {max_length} characters.",
+        "text_empty": "Text cannot be empty.",
+        "text_key_required": "Text key is required.",
+        "set_text_usage": "Usage: /set_text <key> <lang> <text>",
     },
     "fa": {
         "welcome": "ربات مرورگر تلگرام آماده است. برای شروع از /menu استفاده کنید.",
@@ -102,6 +117,21 @@ TEXTS: dict[str, dict[str, str]] = {
         "job_started": "شناسه کار: {job_id}\nوضعیت: {status}",
         "no_links": "پیوندی پیدا نشد.",
         "request_failed": "درخواست ناموفق بود: {error}",
+        "admin_required": "دسترسی مدیر لازم است.",
+        "texts_overview": (
+            "کلیدهای متن قابل ویرایش: welcome, help, about\nزبان‌ها: en, fa\n"
+            "از /set_text، /reset_text و /preview_text استفاده کنید."
+        ),
+        "text_updated": "متن {key}/{language} به‌روزرسانی شد.",
+        "text_reset": "متن {target} به مقدار پیش‌فرض بازنشانی شد.",
+        "text_override_missing": "برای {target} متن سفارشی پیدا نشد.",
+        "text_preview": "پیش‌نمایش {key}/{language}:\n\n{preview}",
+        "text_invalid_key": "کلید متن نامعتبر است. از welcome، help یا about استفاده کنید.",
+        "text_invalid_language": "زبان نامعتبر است. از en یا fa استفاده کنید.",
+        "text_too_long": "متن بیش از حد طولانی است. حداکثر طول {max_length} نویسه است.",
+        "text_empty": "متن نمی‌تواند خالی باشد.",
+        "text_key_required": "کلید متن لازم است.",
+        "set_text_usage": "روش استفاده: /set_text <key> <lang> <text>",
     },
 }
 
@@ -133,9 +163,11 @@ def clear_language_preferences(path: Path | None = None) -> None:
         pass
 
 
-def text(key: str, locale: str = DEFAULT_LANGUAGE, **values: object) -> str:
+def text(message_key: str, locale: str = DEFAULT_LANGUAGE, **values: object) -> str:
     selected = locale if locale in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
-    template = TEXTS.get(selected, {}).get(key) or TEXTS[DEFAULT_LANGUAGE].get(key, key)
+    template = TEXTS.get(selected, {}).get(message_key) or TEXTS[DEFAULT_LANGUAGE].get(
+        message_key, message_key
+    )
     return template.format(**values)
 
 

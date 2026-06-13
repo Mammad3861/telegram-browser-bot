@@ -499,7 +499,7 @@ async def require_runtime_admin(message: Message) -> int | None:
 async def require_admin(message: Message) -> int | None:
     user_id = get_user_id(message)
     if user_id is None or not is_admin(user_id):
-        await message.answer(ADMIN_REQUIRED)
+        await message.answer(text("admin_required", get_language(user_id)))
         return None
     return user_id
 
@@ -564,10 +564,14 @@ async def allowed_users_handler(message: Message) -> None:
 
 def parse_set_text_args(arguments: str | None) -> tuple[str, str, str]:
     if not arguments:
-        raise BotTextValidationError("Usage: /set_text <key> <lang> <text>")
+        raise BotTextValidationError(
+            "Usage: /set_text <key> <lang> <text>", "set_text_usage"
+        )
     parts = arguments.strip().split(maxsplit=2)
     if len(parts) != 3:
-        raise BotTextValidationError("Usage: /set_text <key> <lang> <text>")
+        raise BotTextValidationError(
+            "Usage: /set_text <key> <lang> <text>", "set_text_usage"
+        )
     return parts[0], parts[1], parts[2]
 
 
@@ -575,26 +579,41 @@ def parse_text_target_args(
     arguments: str | None, default_language: str | None = None
 ) -> tuple[str, str | None]:
     if not arguments:
-        raise BotTextValidationError("Text key is required")
+        raise BotTextValidationError("Text key is required", "text_key_required")
     parts = arguments.strip().split(maxsplit=1)
     return parts[0], parts[1] if len(parts) == 2 else default_language
 
 
 @router.message(Command("texts"))
 async def texts_handler(message: Message) -> None:
-    if await require_admin(message) is None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
         return
-    await message.answer(
-        "Editable text keys: welcome, help, about\nLanguages: en, fa\n"
-        "Use /set_text, /reset_text, and /preview_text."
-    )
+    await message.answer(text("texts_overview", get_language(admin_id)))
+
+
+def localized_bot_text_error(
+    error: BotTextValidationError, language: str, max_length: int
+) -> str:
+    key_by_code = {
+        "invalid_key": "text_invalid_key",
+        "invalid_language": "text_invalid_language",
+        "text_too_long": "text_too_long",
+        "empty_text": "text_empty",
+        "text_key_required": "text_key_required",
+        "set_text_usage": "set_text_usage",
+    }
+    key = key_by_code.get(error.code, "set_text_usage")
+    return text(key, language, max_length=max_length)
 
 
 @router.message(Command("set_text"))
 async def set_text_handler(message: Message, command: CommandObject) -> None:
-    if await require_admin(message) is None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
         return
     settings = get_settings()
+    locale = get_language(admin_id)
     try:
         key, language, value = parse_set_text_args(command.args)
         set_bot_text(
@@ -605,24 +624,35 @@ async def set_text_handler(message: Message, command: CommandObject) -> None:
             settings.bot_text_max_length,
         )
     except BotTextValidationError as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(
+            localized_bot_text_error(exc, locale, settings.bot_text_max_length)
+        )
         return
-    await message.answer(f"Updated {key}/{language}.")
+    await message.answer(
+        text("text_updated", locale, key=key, language=language)
+    )
 
 
 @router.message(Command("reset_text"))
 async def reset_text_handler(message: Message, command: CommandObject) -> None:
-    if await require_admin(message) is None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
         return
+    settings = get_settings()
+    locale = get_language(admin_id)
     try:
         key, language = parse_text_target_args(command.args)
-        changed = reset_bot_text(Path(get_settings().bot_texts_path), key, language)
+        changed = reset_bot_text(Path(settings.bot_texts_path), key, language)
     except BotTextValidationError as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(
+            localized_bot_text_error(exc, locale, settings.bot_text_max_length)
+        )
         return
     target = f"{key}/{language}" if language else key
     await message.answer(
-        f"Reset {target} to default." if changed else f"No override found for {target}."
+        text("text_reset", locale, target=target)
+        if changed
+        else text("text_override_missing", locale, target=target)
     )
 
 
@@ -631,14 +661,16 @@ async def preview_text_handler(message: Message, command: CommandObject) -> None
     admin_id = await require_admin(message)
     if admin_id is None:
         return
+    settings = get_settings()
+    locale = get_language(admin_id)
     try:
         key, language = parse_text_target_args(
-            command.args, default_language=get_language(admin_id)
+            command.args, default_language=locale
         )
-        if key not in EDITABLE_TEXT_KEYS or language not in {"en", "fa"}:
-            raise BotTextValidationError(
-                "Key must be welcome, help, or about; language must be en or fa"
-            )
+        if key not in EDITABLE_TEXT_KEYS:
+            raise BotTextValidationError("Invalid text key", "invalid_key")
+        if language not in {"en", "fa"}:
+            raise BotTextValidationError("Invalid language", "invalid_language")
         preview = bot_text(
             key,
             language,
@@ -646,9 +678,19 @@ async def preview_text_handler(message: Message, command: CommandObject) -> None
             runtime_target=RUNTIME_TARGET,
         )
     except BotTextValidationError as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(
+            localized_bot_text_error(exc, locale, settings.bot_text_max_length)
+        )
         return
-    await message.answer(f"Preview {key}/{language}:\n\n{preview}")
+    await message.answer(
+        text(
+            "text_preview",
+            locale,
+            key=key,
+            language=language,
+            preview=preview,
+        )
+    )
 
 
 @router.message(Command("admin_status"))

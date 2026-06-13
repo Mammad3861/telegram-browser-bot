@@ -50,3 +50,29 @@ def test_editable_bot_text_overrides_and_falls_back(tmp_path, monkeypatch) -> No
 
     assert bot_text("welcome", "en") == "Custom welcome"
     assert bot_text("help", "en") == TEXTS["en"]["help"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "texts_overview",
+        "text_updated",
+        "text_reset",
+        "text_preview",
+        "text_invalid_key",
+        "text_invalid_language",
+        "text_too_long",
+        "admin_required",
+    ],
+)
+def test_admin_text_flow_has_persian_translations(key: str) -> None:
+    assert key in TEXTS["fa"]
+    assert TEXTS["fa"][key] != TEXTS["en"][key]
+
+
+def test_admin_text_translation_falls_back_to_english(monkeypatch) -> None:
+    monkeypatch.delitem(TEXTS["fa"], "text_updated")
+
+    assert text("text_updated", "fa", key="help", language="fa") == (
+        "Updated help/fa."
+    )

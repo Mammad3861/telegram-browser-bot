@@ -11,16 +11,20 @@ SUPPORTED_LANGUAGES = {"en", "fa"}
 
 
 class BotTextValidationError(ValueError):
-    pass
+    def __init__(self, message: str, code: str = "invalid_text") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 def validate_text_target(key: str, language: str) -> tuple[str, str]:
     normalized_key = key.strip().lower()
     normalized_language = language.strip().lower()
     if normalized_key not in EDITABLE_TEXT_KEYS:
-        raise BotTextValidationError("Editable key must be welcome, help, or about")
+        raise BotTextValidationError(
+            "Editable key must be welcome, help, or about", "invalid_key"
+        )
     if normalized_language not in SUPPORTED_LANGUAGES:
-        raise BotTextValidationError("Language must be en or fa")
+        raise BotTextValidationError("Language must be en or fa", "invalid_language")
     return normalized_key, normalized_language
 
 
@@ -77,10 +81,10 @@ def set_bot_text(
     key, language = validate_text_target(key, language)
     normalized = value.strip()
     if not normalized:
-        raise BotTextValidationError("Text cannot be empty")
+        raise BotTextValidationError("Text cannot be empty", "empty_text")
     if len(normalized) > max_length:
         raise BotTextValidationError(
-            f"Text must be at most {max_length} characters"
+            f"Text must be at most {max_length} characters", "text_too_long"
         )
     with _store_lock:
         texts = load_bot_texts(path)
@@ -91,7 +95,9 @@ def set_bot_text(
 def reset_bot_text(path: Path, key: str, language: str | None = None) -> bool:
     normalized_key = key.strip().lower()
     if normalized_key not in EDITABLE_TEXT_KEYS:
-        raise BotTextValidationError("Editable key must be welcome, help, or about")
+        raise BotTextValidationError(
+            "Editable key must be welcome, help, or about", "invalid_key"
+        )
     if language is not None:
         _, normalized_language = validate_text_target(normalized_key, language)
     else:
@@ -110,4 +116,3 @@ def reset_bot_text(path: Path, key: str, language: str | None = None) -> bool:
         if changed:
             save_bot_texts(path, texts)
         return changed
-
