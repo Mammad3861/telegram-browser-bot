@@ -12,13 +12,16 @@ SUPPORTED_LANGUAGES = {"en", "fa"}
 
 TEXTS: dict[str, dict[str, str]] = {
     "en": {
-        "welcome": "Telegram Browser Bot is ready. Use /menu to get started.",
-        "menu": "Choose an option or send a single http/https URL.",
+        "welcome": "Telegram Browser\nSend a URL or search the web.",
+        "menu": "Telegram Browser\nSend a URL or search the web.",
         "menu_open_url": "Open URL",
         "menu_sessions": "Sessions",
         "menu_account": "Account",
         "menu_help": "Help",
         "menu_search": "Search Web",
+        "menu_new_url": "New URL",
+        "menu_recent_jobs": "Recent jobs",
+        "menu_language": "Language",
         "help": (
             "Send a URL to open an action card, use /menu, or change language with "
             "/language. Search the web with /search.\n"
@@ -61,7 +64,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "search_closed": "Search results closed.",
         "search_again_button": "Search again",
         "close_button": "Close",
-        "url_card": "URL action card\n\n{url}\n\nChoose an action:",
+        "url_card": "Browser tab\n{title}\n{url}\n\nChoose an action:",
         "url_refreshed": "URL action card refreshed.\n\n{url}\n\nChoose an action:",
         "url_cancelled": "URL session cancelled.",
         "url_screenshot_button": "Screenshot",
@@ -72,6 +75,18 @@ TEXTS: dict[str, dict[str, str]] = {
         "url_download_button": "Download",
         "url_refresh_button": "Refresh",
         "url_cancel_button": "Cancel",
+        "url_back_button": "Back",
+        "url_interact_button": "Interact",
+        "search_input_prompt": "Send your search text.",
+        "url_input_prompt": "Send one public http/https URL.",
+        "interaction_choose": "Choose an element:",
+        "interaction_none": "No safe visible interactive elements were found.",
+        "interaction_failed": "Page interaction failed. Try another action.",
+        "direct_file_only": "This version only supports direct file links.",
+        "interaction_expired": "This interaction list expired. Open Interact again.",
+        "tab_back_unavailable": "There is no previous page in this tab.",
+        "commands_refresh_success": "Telegram command menus were refreshed. Client caching may delay updates.",
+        "commands_refresh_failed": "Telegram command menus could not be refreshed.",
         "session_expired": "This URL session expired. Please send the URL again.",
         "session_not_owned": "This URL session belongs to another user.",
         "access_denied": "Access denied. Ask the bot owner for access.",
@@ -182,6 +197,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "proxy_not_configured": "Proxy route is not configured.",
         "policy_status": (
             "Content policy: {state}\nDefault action: {default_action}\n"
+            "Built-in safety filter: {builtin_state}\n"
             "Blocked domains: {blocked}\nAllowed domains: {allowed}\n"
             "Blocked categories: {categories}\nUpdated: {updated_at}"
         ),
@@ -192,6 +208,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "policy_test_result": "Policy test: {decision}\nReason: {reason}\nCategory: {category}",
         "policy_reloaded": "Content policy reloaded. Blocked domains: {count}.",
         "policy_usage_block": "Usage: /block_domain <domain> [category]",
+        "policy_invalid_category": "Invalid category. Use: {categories}.",
+        "policy_category_adult": "adult",
+        "policy_category_gambling": "gambling",
+        "policy_category_malware": "malware",
+        "policy_category_phishing": "phishing",
+        "policy_category_dangerous": "dangerous",
+        "policy_category_media": "media",
+        "policy_category_custom": "custom",
         "policy_usage_domain": "Usage: /{command} <domain>",
         "policy_usage_test": "Usage: /policy_test <url>",
         "allowed": "allowed",
@@ -220,13 +244,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "set_text_usage": "Usage: /set_text <key> <lang> <text>",
     },
     "fa": {
-        "welcome": "ربات مرورگر تلگرام آماده است. برای شروع از /menu استفاده کنید.",
-        "menu": "یک گزینه را انتخاب کنید یا یک نشانی http/https بفرستید.",
+        "welcome": "مرورگر تلگرامی\nیک نشانی بفرستید یا جست‌وجو کنید.",
+        "menu": "مرورگر تلگرامی\nیک نشانی بفرستید یا جست‌وجو کنید.",
         "menu_open_url": "باز کردن نشانی",
         "menu_sessions": "نشست‌ها",
         "menu_account": "حساب",
         "menu_help": "راهنما",
         "menu_search": "جست‌وجوی وب",
+        "menu_new_url": "تب جدید / نشانی جدید",
+        "menu_recent_jobs": "کارهای اخیر",
+        "menu_language": "زبان",
         "help": (
             "یک نشانی بفرستید تا کارت عملیات ساخته شود، از /menu استفاده کنید، زبان را با /language تغییر دهید، یا با /search جست‌وجو کنید.\n"
             "دستورهای پیشرفته مانند /fetch، /links، /html، /screenshot و /pdf همچنان فعال هستند."
@@ -267,7 +294,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "search_closed": "نتایج جست‌وجو بسته شد.",
         "search_again_button": "جست‌وجوی دوباره",
         "close_button": "بستن",
-        "url_card": "کارت عملیات نشانی\n\n{url}\n\nیک عملیات را انتخاب کنید:",
+        "url_card": "تب مرورگر\n{title}\n{url}\n\nیک عملیات را انتخاب کنید:",
         "url_refreshed": "کارت عملیات تازه‌سازی شد.\n\n{url}\n\nیک عملیات را انتخاب کنید:",
         "url_cancelled": "نشست این نشانی لغو شد.",
         "url_screenshot_button": "تصویر",
@@ -278,6 +305,18 @@ TEXTS: dict[str, dict[str, str]] = {
         "url_download_button": "دانلود",
         "url_refresh_button": "تازه‌سازی",
         "url_cancel_button": "لغو",
+        "url_back_button": "بازگشت",
+        "url_interact_button": "تعامل",
+        "search_input_prompt": "عبارت جست‌وجو را بفرستید.",
+        "url_input_prompt": "یک نشانی عمومی http/https بفرستید.",
+        "interaction_choose": "یک گزینه را انتخاب کنید:",
+        "interaction_none": "گزینه تعاملی امن و قابل مشاهده‌ای پیدا نشد.",
+        "interaction_failed": "تعامل با صفحه ناموفق بود. عملیات دیگری را امتحان کنید.",
+        "direct_file_only": "این نسخه فقط از پیوند مستقیم فایل پشتیبانی می‌کند.",
+        "interaction_expired": "فهرست تعامل منقضی شده است. دوباره تعامل را باز کنید.",
+        "tab_back_unavailable": "صفحه قبلی در این تب وجود ندارد.",
+        "commands_refresh_success": "منوی دستورات تلگرام تازه‌سازی شد. کش تلگرام ممکن است نمایش تغییرات را به تأخیر بیندازد.",
+        "commands_refresh_failed": "تازه‌سازی منوی دستورات تلگرام ناموفق بود.",
         "session_expired": "نشست این نشانی منقضی شده است. لطفاً نشانی را دوباره بفرستید.",
         "session_not_owned": "این نشست متعلق به کاربر دیگری است.",
         "access_denied": "دسترسی رد شد. از مالک ربات درخواست دسترسی کنید.",
@@ -386,6 +425,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "proxy_not_configured": "مسیر پراکسی تنظیم نشده است.",
         "policy_status": (
             "سیاست محتوا: {state}\nعمل پیش‌فرض: {default_action}\n"
+            "فیلتر ایمنی داخلی: {builtin_state}\n"
             "دامنه‌های مسدود: {blocked}\nدامنه‌های مجاز: {allowed}\n"
             "دسته‌های مسدود: {categories}\nآخرین تغییر: {updated_at}"
         ),
@@ -396,6 +436,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "policy_test_result": "آزمایش سیاست: {decision}\nدلیل: {reason}\nدسته: {category}",
         "policy_reloaded": "سیاست محتوا دوباره بارگذاری شد. دامنه‌های مسدود: {count}.",
         "policy_usage_block": "روش استفاده: /block_domain <domain> [category]",
+        "policy_invalid_category": "دسته نامعتبر است. یکی از این موارد را انتخاب کنید: {categories}.",
+        "policy_category_adult": "بزرگسالان",
+        "policy_category_gambling": "قمار",
+        "policy_category_malware": "بدافزار",
+        "policy_category_phishing": "فیشینگ",
+        "policy_category_dangerous": "خطرناک",
+        "policy_category_media": "رسانه",
+        "policy_category_custom": "سفارشی",
         "policy_usage_domain": "روش استفاده: /{command} <domain>",
         "policy_usage_test": "روش استفاده: /policy_test <url>",
         "allowed": "مجاز",

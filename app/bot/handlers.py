@@ -24,6 +24,8 @@ from app.core.content_policy import (
     ContentPolicy,
     PolicyDecision,
     add_domain_rule,
+    apply_builtin_safety_lists,
+    check_query_allowed,
     check_url_allowed,
     is_protected_media_domain,
     load_content_policy,
@@ -71,8 +73,10 @@ from app.core.url_sessions import (
 )
 from app.core.url_validation import URLValidationError, validate_url
 from app.bot.i18n import bot_text, get_language, set_language, text
+from app.bot.commands import register_bot_commands
 from app.bot.ui import (
     detect_plain_url,
+    interaction_keyboard,
     menu_keyboard,
     parse_url_callback_data,
     url_action_keyboard,
@@ -106,6 +110,11 @@ from app.fetchers.file_downloader import DownloadError, FileDownloader
 from app.fetchers.file_detector import is_direct_file
 from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
+from app.fetchers.browser_interaction import (
+    InteractiveElement,
+    activate_interactive_element,
+    extract_interactive_elements,
+)
 from app.version import APP_VERSION
 from app.search.providers import (
     SearchConfigurationError,
@@ -137,6 +146,31 @@ logger = logging.getLogger(__name__)
 HELP_TEXT = text("help", "en")
 
 pending_cookie_imports: dict[int, str] = {}
+pending_user_inputs: dict[int, str] = {}
+pending_interactions: dict[tuple[int, str], list[InteractiveElement]] = {}
+POLICY_CATEGORY_NAMES = (
+    "adult",
+    "gambling",
+    "malware",
+    "phishing",
+    "dangerous",
+    "media",
+    "custom",
+)
+
+
+def begin_user_input(user_id: int, mode: str) -> None:
+    if mode not in {"search", "url"}:
+        raise ValueError("Unsupported input mode")
+    pending_user_inputs[user_id] = mode
+
+
+def consume_user_input(user_id: int) -> str | None:
+    return pending_user_inputs.pop(user_id, None)
+
+
+def policy_category_label(category: str, language: str) -> str:
+    return text(f"policy_category_{category}", language)
 
 
 def get_user_id(message: Message) -> int | None:
@@ -145,9 +179,14 @@ def get_user_id(message: Message) -> int | None:
 
 def current_content_policy() -> ContentPolicy:
     settings = get_settings()
-    return load_content_policy(
+    policy = load_content_policy(
         Path(settings.content_policy_path), settings.content_policy_default_action
     )
+    if settings.enable_builtin_safety_blocklist:
+        apply_builtin_safety_lists(
+            policy, settings.builtin_block_adult, settings.builtin_block_gambling
+        )
+    return policy
 
 
 def policy_decision(url: str) -> PolicyDecision:
@@ -286,7 +325,8 @@ async def menu_callback_handler(callback: CallbackQuery) -> None:
     if callback.message is None:
         return
     if action == "open_url":
-        await callback.message.answer(text("open_url", language))
+        begin_user_input(user_id, "url")
+        await callback.message.answer(text("url_input_prompt", language))
     elif action == "sessions":
         if not is_allowed_user(user_id):
             await callback.message.answer(text("access_denied", language))
@@ -297,16 +337,22 @@ async def menu_callback_handler(callback: CallbackQuery) -> None:
             if sessions
             else text("sessions", language)
         )
-    elif action == "account":
+    elif action == "jobs":
+        jobs = list_job_records(
+            user_id,
+            is_admin(user_id),
+            job_store,
+            Path(get_settings().job_history_path),
+        )
         await callback.message.answer(
-            text(
-                "account",
-                language,
-                user_id=user_id,
-                admin=text("yes" if is_admin(user_id) else "no", language),
-                access=text("yes" if is_allowed_user(user_id) else "no", language),
-                language=language,
+            "\n\n".join(
+                format_job(job, language)
+                if isinstance(job, Job)
+                else format_job_history(job, language)
+                for job in jobs[:5]
             )
+            if jobs
+            else text("no_jobs", language)
         )
     elif action == "help":
         await callback.message.answer(
@@ -316,11 +362,18 @@ async def menu_callback_handler(callback: CallbackQuery) -> None:
         if not is_allowed_user(user_id):
             await callback.message.answer(text("access_denied", language))
             return
-        await callback.message.answer(text("search_help", language))
+        begin_user_input(user_id, "search")
+        await callback.message.answer(text("search_input_prompt", language))
+    elif action == "language":
+        await callback.message.answer(text("language_current", language, language=language))
 
 
 async def perform_search(query: str) -> list[SearchResult]:
     settings = get_settings()
+    if settings.enable_content_policy and not check_query_allowed(
+        query, current_content_policy()
+    ).allowed:
+        raise PermissionError("content_policy_blocked")
     limit = max(1, min(settings.search_results_limit, 5))
     results = await search_web(
         settings.search_provider,
@@ -399,6 +452,8 @@ async def search_handler(message: Message, command: CommandObject) -> None:
     except SearchConfigurationError:
         logger.warning("Search provider is misconfigured")
         await message.answer(text("search_misconfigured", language))
+    except PermissionError as exc:
+        await message.answer(permission_error_message(exc, language))
     except Exception as exc:
         logger.warning("Search failed: exception_type=%s", type(exc).__name__)
         await message.answer(text("search_unavailable", language))
@@ -513,7 +568,7 @@ async def create_url_card(message: Message, user_id: int, url: str) -> None:
         return
     session = url_session_store.create(user_id, url)
     hostname = urlparse(url).hostname or ""
-    card_text = text("url_card", language, url=url)
+    card_text = text("url_card", language, url=url, title=hostname or url)
     if is_protected_media_domain(hostname):
         card_text += "\n\n" + text("media_site_note", language)
     sent = await message.answer(
@@ -574,6 +629,41 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
                 else ""
             ),
             reply_markup=url_action_keyboard(session.session_id, language),
+        )
+        return
+    if parsed.action == "back":
+        previous = url_session_store.back(session.session_id, user_id)
+        if previous is None:
+            await message.answer(text("tab_back_unavailable", language))
+            return
+        await message.edit_text(
+            text("url_refreshed", language, url=previous.url),
+            reply_markup=url_action_keyboard(previous.session_id, language),
+        )
+        return
+    if parsed.action == "interact":
+        settings = get_settings()
+        try:
+            elements = await extract_interactive_elements(
+                session.url,
+                settings.interaction_timeout_seconds,
+                settings.interaction_max_elements,
+                browser_cookies_for_user_url(user_id, session.url),
+                browser_proxy_for_target(session.url),
+            )
+        except Exception as exc:
+            logger.warning("Interaction extraction failed: exception_type=%s", type(exc).__name__)
+            await message.answer(text("interaction_failed", language))
+            return
+        if not elements:
+            await message.answer(text("interaction_none", language))
+            return
+        pending_interactions[(user_id, session.session_id)] = elements
+        await message.answer(
+            text("interaction_choose", language),
+            reply_markup=interaction_keyboard(
+                session.session_id, [element.label for element in elements]
+            ),
         )
         return
     if parsed.action == "links":
@@ -964,6 +1054,20 @@ async def purge_history_handler(message: Message) -> None:
     await message.answer(text("purge_history_summary", language, count=purged))
 
 
+@router.message(Command("refresh_commands"))
+async def refresh_commands_handler(message: Message) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    success = await register_bot_commands(message.bot, get_settings())
+    await message.answer(
+        text(
+            "commands_refresh_success" if success else "commands_refresh_failed",
+            get_language(admin_id),
+        )
+    )
+
+
 def content_policy_path() -> Path:
     return Path(get_settings().content_policy_path)
 
@@ -980,10 +1084,22 @@ async def policy_handler(message: Message) -> None:
         "policy_status",
         language,
         state=text("enabled" if settings.enable_content_policy else "disabled", language),
-        default_action=settings.content_policy_default_action,
+        default_action=text(
+            "allowed"
+            if settings.content_policy_default_action == "allow"
+            else "blocked",
+            language,
+        ),
         blocked=len(policy.blocked_domains),
         allowed=len(policy.allowed_domains),
-        categories=", ".join(policy.blocked_categories) or text("none", language),
+        categories=", ".join(
+            policy_category_label(category, language)
+            for category in policy.blocked_categories
+        ) or text("none", language),
+        builtin_state=text(
+            "enabled" if settings.enable_builtin_safety_blocklist else "disabled",
+            language,
+        ),
         updated_at=policy.updated_at,
     ))
 
@@ -1006,9 +1122,18 @@ async def update_policy_domain(
         await message.answer(text(key, language, command=command_name))
         return
     category = arguments[1].lower() if len(arguments) > 1 and not allow and not remove else None
-    if category and category not in CATEGORY_FIELDS:
-        await message.answer(text("request_failed", language, error="Invalid category"))
+    if category and category not in {*CATEGORY_FIELDS, "custom"}:
+        await message.answer(text(
+            "policy_invalid_category",
+            language,
+            categories=", ".join(
+                policy_category_label(value, language)
+                for value in POLICY_CATEGORY_NAMES
+            ),
+        ))
         return
+    if category == "custom":
+        category = None
     try:
         domain = normalize_policy_domain(arguments[0])
         changed = (
@@ -1067,7 +1192,11 @@ async def policy_test_handler(message: Message, command: CommandObject) -> None:
         language,
         decision=text("allowed" if decision.allowed else "blocked", language),
         reason=decision.reason,
-        category=decision.category or text("none", language),
+        category=(
+            policy_category_label(decision.category, language)
+            if decision.category
+            else text("none", language)
+        ),
     ))
 
 
@@ -1324,10 +1453,14 @@ def create_background_job_for_user(user_id: int, command: str, url: str) -> Job:
 
 
 def browser_cookies_for_job(job: Job) -> tuple[dict, ...]:
-    hostname = urlparse(job.url).hostname
+    return browser_cookies_for_user_url(job.user_id, job.url)
+
+
+def browser_cookies_for_user_url(user_id: int, url: str) -> tuple[dict, ...]:
+    hostname = urlparse(url).hostname
     if not hostname:
         return ()
-    return tuple(load_cookies_for_domain(job.user_id, hostname))
+    return tuple(load_cookies_for_domain(user_id, hostname))
 
 
 async def run_html_job(job: Job, message: Message) -> None:
@@ -1550,7 +1683,12 @@ async def run_download_job(job: Job, message: Message) -> None:
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except (URLValidationError, DownloadError, StorageError, OSError) as exc:
-        await fail_job(job.id, message, str(exc))
+        safe_error = (
+            text("direct_file_only", language)
+            if "only supports direct file links" in str(exc)
+            else str(exc)
+        )
+        await fail_job(job.id, message, safe_error)
     except RoutingError:
         await fail_job(job.id, message, text("proxy_not_configured", language))
     except Exception:
@@ -1900,6 +2038,46 @@ async def cancel_handler(message: Message, command: CommandObject) -> None:
     )
 
 
+@router.callback_query(F.data.startswith("interact:"))
+async def interaction_callback_handler(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    language = get_language(user_id)
+    parts = (callback.data or "").split(":")
+    if len(parts) != 3 or not parts[2].isdigit():
+        await callback.answer(text("invalid_action", language), show_alert=True)
+        return
+    session_id, index = parts[1], int(parts[2])
+    elements = pending_interactions.get((user_id, session_id))
+    if elements is None or index >= len(elements):
+        await callback.answer(text("interaction_expired", language), show_alert=True)
+        return
+    try:
+        session = url_session_store.get_for_user(
+            session_id, user_id, get_settings().url_session_ttl_minutes
+        )
+        element = elements[index]
+        final_url, title = await activate_interactive_element(
+            session.url,
+            element,
+            get_settings().interaction_timeout_seconds,
+            browser_cookies_for_user_url(user_id, session.url),
+            browser_proxy_for_target(session.url),
+        )
+        validate_action_url(final_url)
+        updated = url_session_store.navigate(session_id, user_id, final_url, title)
+    except Exception as exc:
+        logger.warning("Interaction activation failed: exception_type=%s", type(exc).__name__)
+        await callback.answer(text("interaction_failed", language), show_alert=True)
+        return
+    pending_interactions.pop((user_id, session_id), None)
+    await callback.answer()
+    if callback.message is not None and updated is not None:
+        await callback.message.answer(
+            text("url_refreshed", language, url=updated.url),
+            reply_markup=url_action_keyboard(updated.session_id, language),
+        )
+
+
 @router.message()
 async def text_message_handler(message: Message) -> None:
     user_id = get_user_id(message)
@@ -1936,10 +2114,36 @@ async def text_message_handler(message: Message) -> None:
         await message.answer(text("cookies_saved", get_language(user_id), domain=domain))
         return
 
+    language = get_language(user_id)
+    pending = consume_user_input(user_id)
+    if pending == "search":
+        try:
+            query = validate_search_query(
+                message.text, get_settings().search_query_max_length
+            )
+            await send_search_results(message, user_id, query, language)
+        except SearchQueryError:
+            await message.answer(text("search_usage", language))
+        except SearchDisabledError:
+            await message.answer(text("search_disabled", language))
+        except SearchConfigurationError:
+            await message.answer(text("search_misconfigured", language))
+        except PermissionError as exc:
+            await message.answer(permission_error_message(exc, language))
+        except Exception:
+            await message.answer(text("search_unavailable", language))
+        return
+    if pending == "url":
+        url = detect_plain_url(message.text)
+        if url is None:
+            await message.answer(text("invalid_url", language))
+            return
+        await create_url_card(message, user_id, url)
+        return
+
     stripped = message.text.strip()
     if not stripped.lower().startswith(("http://", "https://")):
         return
-    language = get_language(user_id)
     if not is_allowed_user(user_id):
         await message.answer(text("access_denied", language))
         return

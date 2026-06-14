@@ -98,3 +98,35 @@ def test_rejects_normal_html_page(tmp_path) -> None:
         DownloadError, match="This version only supports direct file links"
     ):
         run_download(handler, tmp_path, url="https://example.com/page")
+
+
+def test_downloads_github_codeload_zip(tmp_path) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/zip"},
+            stream=ChunkStream([b"zip"]),
+        )
+
+    result = run_download(
+        handler,
+        tmp_path,
+        url="https://codeload.github.com/example/project/zip/refs/heads/main",
+    )
+
+    assert result.size == 3
+
+
+def test_follows_redirect_to_direct_file(tmp_path) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/start":
+            return httpx.Response(302, headers={"location": "/file.msi"})
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/octet-stream"},
+            stream=ChunkStream([b"installer"]),
+        )
+
+    result = run_download(handler, tmp_path, url="https://example.com/start")
+
+    assert result.filename == "file.msi"

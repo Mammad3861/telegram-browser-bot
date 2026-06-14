@@ -110,3 +110,20 @@ def test_corrupted_url_session_json_falls_back_to_empty_store(tmp_path) -> None:
 
     with pytest.raises(URLSessionNotFound):
         URLSessionStore(path).get_for_user("missing", 123, ttl_minutes=60, now=NOW)
+
+
+def test_tab_navigation_and_back_history() -> None:
+    store = URLSessionStore()
+    session = store.create(123, "https://example.com", now=NOW)
+
+    navigated = store.navigate(
+        session.session_id, 123, "https://example.com/next", "Next", now=NOW
+    )
+    assert navigated is not None
+    assert navigated.current_url == "https://example.com/next"
+    assert navigated.history == ("https://example.com",)
+
+    previous = store.back(session.session_id, 123, now=NOW)
+    assert previous is not None
+    assert previous.current_url == "https://example.com"
+    assert previous.history == ()

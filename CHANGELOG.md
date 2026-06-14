@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.7.0-alpha.1] - 2026-06-15
+
+### Added
+
+- Button-first English/Persian browser home with Search, New URL, Sessions, Recent jobs, Language, and Help.
+- Persistent browser-tab history with Back, Refresh, Interact, and existing export/download actions.
+- Explicit Playwright interaction for a limited set of visible links and simple buttons.
+- Configurable native command-menu language modes and administrator `/refresh_commands`.
+- Optional built-in adult and gambling domain seed lists.
+
+### Improved
+
+- Search queries now honor blocked keywords and policy-filtered results.
+- Direct downloads use HEAD hints, redirect handling, streaming fallback, and broader direct-file detection.
+- Content-policy status, category guidance, Persian messages, and command-menu documentation were polished.
+
+### Safety
+
+- Interaction does not fill forms, submit passwords, bypass age gates automatically, or bypass CAPTCHA, DRM, paywalls, login restrictions, or anti-bot systems.
+- Direct download remains limited to direct file links and retains SSRF, policy, storage, and size checks.
+
 ## [v1.6.0-alpha.1] - 2026-06-15
 
 ### Added

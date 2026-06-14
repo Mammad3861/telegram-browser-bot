@@ -14,10 +14,8 @@ def build_default_commands(language: str = "en") -> list[BotCommand]:
         {
             "start": "شروع ربات",
             "menu": "باز کردن منوی اصلی",
-            "search": "جست‌وجوی وب",
             "help": "نمایش راهنما",
             "language": "تغییر زبان",
-            "about": "درباره این ربات",
             "sessions": "مدیریت نشست‌ها",
             "whoami": "نمایش شناسه تلگرام شما",
         }
@@ -25,10 +23,8 @@ def build_default_commands(language: str = "en") -> list[BotCommand]:
         else {
             "start": "Start the bot",
             "menu": "Open interactive menu",
-            "search": "Search the web",
             "help": "Show help",
             "language": "Change language",
-            "about": "About this bot",
             "sessions": "Manage saved sessions",
             "whoami": "Show your Telegram ID",
         }
@@ -44,39 +40,23 @@ def build_admin_commands(language: str = "en") -> list[BotCommand]:
         {
             "admin_status": "نمایش وضعیت اجرا",
             "allowed_users": "نمایش کاربران مجاز",
-            "allow": "دادن دسترسی به کاربر",
-            "deny": "لغو دسترسی کاربر",
             "cleanup": "حذف فایل‌های قدیمی",
             "purge_history": "حذف تاریخچه کارها",
             "texts": "مدیریت متن‌های ربات",
-            "set_text": "تنظیم متن ربات",
-            "reset_text": "بازنشانی متن ربات",
-            "preview_text": "پیش‌نمایش متن ربات",
             "policy": "نمایش سیاست محتوا",
-            "block_domain": "مسدود کردن دامنه",
-            "allow_domain": "مجاز کردن دامنه",
-            "policy_test": "آزمایش سیاست محتوا",
             "routes": "نمایش مسیرهای خروجی",
-            "route_domain": "تنظیم مسیر دامنه",
+            "refresh_commands": "تازه‌سازی منوی دستورات",
         }
         if language == "fa"
         else {
             "admin_status": "Show runtime status",
             "allowed_users": "List allowed users",
-            "allow": "Grant runtime access",
-            "deny": "Revoke runtime access",
             "cleanup": "Delete old generated files",
             "purge_history": "Clear completed job history",
             "texts": "List editable bot texts",
-            "set_text": "Set a bot text",
-            "reset_text": "Reset a bot text",
-            "preview_text": "Preview a bot text",
             "policy": "Show content policy",
-            "block_domain": "Block a domain",
-            "allow_domain": "Allow a domain",
-            "policy_test": "Test content policy",
             "routes": "Show outbound routes",
-            "route_domain": "Set a domain route",
+            "refresh_commands": "Refresh command menus",
         }
     )
     return [
@@ -91,25 +71,37 @@ async def register_bot_commands(bot: Bot, settings: Settings) -> bool:
         return False
 
     try:
-        default_language = "fa" if settings.force_persian_command_menu else "en"
+        mode = settings.command_menu_language_mode.lower()
+        if settings.force_persian_command_menu and mode == "auto":
+            mode = "force_fa"
+        if mode not in {"auto", "force_fa", "force_en"}:
+            mode = "auto"
+        default_language = "fa" if mode == "force_fa" else "en"
+        if settings.reset_telegram_commands_on_start:
+            await bot.delete_my_commands(scope=BotCommandScopeDefault())
+            await bot.delete_my_commands(
+                scope=BotCommandScopeDefault(), language_code="fa"
+            )
         await bot.set_my_commands(
             build_default_commands(default_language), scope=BotCommandScopeDefault()
         )
-        await bot.set_my_commands(
-            build_default_commands("fa"),
-            scope=BotCommandScopeDefault(),
-            language_code="fa",
-        )
+        if mode != "force_en":
+            await bot.set_my_commands(
+                build_default_commands("fa"),
+                scope=BotCommandScopeDefault(),
+                language_code="fa",
+            )
         for admin_id in parse_telegram_ids(settings.admin_telegram_ids):
             await bot.set_my_commands(
                 build_default_commands("en") + build_admin_commands("en"),
                 scope=BotCommandScopeChat(chat_id=admin_id),
             )
-            await bot.set_my_commands(
-                build_default_commands("fa") + build_admin_commands("fa"),
-                scope=BotCommandScopeChat(chat_id=admin_id),
-                language_code="fa",
-            )
+            if mode != "force_en":
+                await bot.set_my_commands(
+                    build_default_commands("fa") + build_admin_commands("fa"),
+                    scope=BotCommandScopeChat(chat_id=admin_id),
+                    language_code="fa",
+                )
     except Exception as exc:
         logger.warning(
             "Telegram command registration failed: exception_type=%s",

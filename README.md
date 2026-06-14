@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml)
 
-**Current version:** `v1.6.0-alpha.1`
+**Current version:** `v1.7.0-alpha.1`
 
 A Docker-first Telegram bot for safely fetching pages, searching the web, extracting links, downloading direct files, and exporting HTML, screenshots, and PDFs. The supported production target is Ubuntu 24.04 or Docker Compose.
 
@@ -10,7 +10,7 @@ A Docker-first Telegram bot for safely fetching pages, searching the web, extrac
 
 ## Key Features
 
-- Interactive Telegram menu, URL action cards, and provider-labeled search result cards
+- Button-first Telegram browser home, persistent URL tabs, safe page interaction, and provider-labeled search result cards
 - HTTP fetch, link extraction, direct downloads, HTML, rendered HTML, screenshots, and PDF exports
 - English and Persian UI with persistent language preferences
 - Static and runtime access control with admin commands
@@ -49,9 +49,9 @@ curl http://127.0.0.1:18080/health
 
 ## Basic Usage
 
-- Send `/menu` to open the interactive menu.
-- Send a public `http://` or `https://` URL to open an action card.
-- Send `/search your query` for basic web search results.
+- Send `/menu` to open the browser home, then tap Search or New URL.
+- Send a public `http://` or `https://` URL to open a browser tab card.
+- Use the tab buttons for links, screenshots, PDF, HTML, downloads, navigation, and explicit safe interaction.
 
 Advanced slash commands remain available. See the [complete command reference](docs/commands.md).
 
@@ -71,6 +71,8 @@ Advanced slash commands remain available. See the [complete command reference](d
 - URLs are validated and localhost/private network destinations are blocked.
 - Search result URLs are validated before URL cards are opened.
 - The bot does not bypass CAPTCHAs or anti-bot systems and does not scrape Google directly.
+- The bot does not bypass DRM, paywalls, or login restrictions and does not store usernames or passwords.
+- Direct downloads support direct file links only. Some sites do not work fully in a headless browser.
 - Cookie sessions are encrypted locally, isolated by Telegram user and domain, and require a stable encryption key.
 - Username/password login storage and OpenAI/ChatGPT assistant features are not implemented.
 - Persistent data lives under `downloads/`; do not commit it.

@@ -18,6 +18,9 @@ class FakeBot:
             raise RuntimeError("simulated Telegram failure")
         self.calls.append({"commands": commands, **kwargs})
 
+    async def delete_my_commands(self, **kwargs) -> None:
+        self.calls.append({"delete": True, **kwargs})
+
 
 def test_default_command_list_builder() -> None:
     commands = build_default_commands("en")
@@ -25,10 +28,8 @@ def test_default_command_list_builder() -> None:
     assert [command.command for command in commands] == [
         "start",
         "menu",
-        "search",
         "help",
         "language",
-        "about",
         "sessions",
         "whoami",
     ]
@@ -41,10 +42,8 @@ def test_persian_default_command_list_builder() -> None:
     assert [command.command for command in commands] == [
         "start",
         "menu",
-        "search",
         "help",
         "language",
-        "about",
         "sessions",
         "whoami",
     ]
@@ -57,20 +56,12 @@ def test_admin_command_list_builder() -> None:
     assert [command.command for command in commands] == [
         "admin_status",
         "allowed_users",
-        "allow",
-        "deny",
         "cleanup",
         "purge_history",
         "texts",
-        "set_text",
-        "reset_text",
-        "preview_text",
         "policy",
-        "block_domain",
-        "allow_domain",
-        "policy_test",
         "routes",
-        "route_domain",
+        "refresh_commands",
     ]
 
 
@@ -80,20 +71,12 @@ def test_persian_admin_command_list_builder() -> None:
     assert [command.command for command in commands] == [
         "admin_status",
         "allowed_users",
-        "allow",
-        "deny",
         "cleanup",
         "purge_history",
         "texts",
-        "set_text",
-        "reset_text",
-        "preview_text",
         "policy",
-        "block_domain",
-        "allow_domain",
-        "policy_test",
         "routes",
-        "route_domain",
+        "refresh_commands",
     ]
     assert commands[0].description == "نمایش وضعیت اجرا"
 
@@ -136,7 +119,7 @@ def test_registration_includes_default_localized_and_admin_scopes() -> None:
     assert bot.calls[1]["commands"][1].description == "باز کردن منوی اصلی"
     admin_calls = bot.calls[2:]
     assert {call["scope"].chat_id for call in admin_calls} == {123, 456}
-    assert all(len(call["commands"]) == 24 for call in admin_calls)
+    assert all(len(call["commands"]) == 14 for call in admin_calls)
     assert all(
         call["commands"][0].description == (
             "شروع ربات" if call.get("language_code") == "fa" else "Start the bot"
@@ -158,6 +141,46 @@ def test_force_persian_command_menu_uses_persian_for_no_language_default() -> No
     assert result is True
     assert bot.calls[0].get("language_code") is None
     assert bot.calls[0]["commands"][1].description == "باز کردن منوی اصلی"
+    assert bot.calls[1]["language_code"] == "fa"
+
+
+def test_force_en_registers_only_english_default() -> None:
+    bot = FakeBot()
+    settings = Settings(
+        _env_file=None,
+        command_menu_language_mode="force_en",
+        register_bot_commands=True,
+    )
+
+    assert asyncio.run(register_bot_commands(bot, settings)) is True  # type: ignore[arg-type]
+    assert len(bot.calls) == 1
+    assert bot.calls[0].get("language_code") is None
+
+
+def test_force_fa_mode_registers_persian_default() -> None:
+    bot = FakeBot()
+    settings = Settings(
+        _env_file=None,
+        command_menu_language_mode="force_fa",
+        register_bot_commands=True,
+    )
+
+    assert asyncio.run(register_bot_commands(bot, settings)) is True  # type: ignore[arg-type]
+    assert bot.calls[0].get("language_code") is None
+    assert bot.calls[0]["commands"][1].description == build_default_commands("fa")[1].description
+
+
+def test_reset_commands_deletes_default_languages_first() -> None:
+    bot = FakeBot()
+    settings = Settings(
+        _env_file=None,
+        reset_telegram_commands_on_start=True,
+        register_bot_commands=True,
+    )
+
+    assert asyncio.run(register_bot_commands(bot, settings)) is True  # type: ignore[arg-type]
+    assert bot.calls[0]["delete"] is True
+    assert bot.calls[1]["delete"] is True
     assert bot.calls[1]["language_code"] == "fa"
 
 

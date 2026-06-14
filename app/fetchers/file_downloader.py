@@ -56,6 +56,21 @@ class FileDownloader(HttpFetcher):
         try:
             for _ in range(6):
                 await self._validate_destination(current_url)
+                try:
+                    head = await self.client.head(current_url)
+                    if head.is_redirect:
+                        location = head.headers.get("location")
+                        if location:
+                            current_url = urljoin(str(head.url), location)
+                            continue
+                    if head.status_code < 400:
+                        length = head.headers.get("content-length")
+                        if length and int(length) > max_bytes:
+                            raise DownloadError(
+                                f"File exceeds the {max_size_mb} MB download limit"
+                            )
+                except (httpx.HTTPError, ValueError):
+                    pass
                 async with self.client.stream("GET", current_url) as response:
                     if response.is_redirect:
                         location = response.headers.get("location")

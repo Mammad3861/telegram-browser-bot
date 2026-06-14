@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     url_session_ttl_minutes: int = 60
     register_bot_commands: bool = True
     force_persian_command_menu: bool = False
+    command_menu_language_mode: str = "auto"
+    reset_telegram_commands_on_start: bool = False
     search_provider: str = "duckduckgo_html"
     search_results_limit: int = 5
     search_timeout_seconds: float = 15.0
@@ -60,6 +62,11 @@ class Settings(BaseSettings):
     https_proxy_url: str = ""
     playwright_proxy_server: str = ""
     domain_route_rules_path: str = "downloads/policies/route_rules.json"
+    interaction_max_elements: int = 10
+    interaction_timeout_seconds: float = 30.0
+    enable_builtin_safety_blocklist: bool = True
+    builtin_block_adult: bool = True
+    builtin_block_gambling: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

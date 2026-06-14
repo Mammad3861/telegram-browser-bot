@@ -1,6 +1,6 @@
 # Command Reference
 
-Telegram's native Menu button contains the common commands. Advanced commands remain available by typing them directly.
+Telegram's native Menu button contains only common commands. `/start` and `/menu` open a button-first browser home with Search, New URL, Sessions, Recent jobs, Language, and Help. Advanced commands remain available by typing them directly.
 
 English and Persian preferences cover menus, URL/search cards, buttons, jobs, admin text tools, and common bot messages. Telegram clients may cache native command descriptions briefly after the bot registers updated `language_code="fa"` commands; reopening the chat or restarting the client usually refreshes them.
 
@@ -48,7 +48,9 @@ These require an administrator or allowed user.
 | `/sessions` | List saved cookie-session domains. |
 | `/delete_session <domain>` | Delete one saved cookie session. |
 
-You can also send a single public URL without a command to create an action card.
+You can also send a single public URL without a command to create a persistent browser tab card. Its buttons provide Back, Refresh, Links, Screenshot, PDF, HTML, Rendered HTML, direct Download, explicit Interact, and Close actions.
+
+Interact lists up to the configured number of visible links and simple buttons. It never fills forms, submits passwords, or automatically passes age/consent gates; the user must choose an element explicitly.
 
 Examples:
 
@@ -86,6 +88,7 @@ Persian: یک نشانی عمومی مانند `https://example.com` بفرست�
 | `/route_domain <domain> <default\|proxy>` | Set a domain route. |
 | `/unroute_domain <domain>` | Remove a domain route rule. |
 | `/route_test <url>` | Show the selected route or missing configuration. |
+| `/refresh_commands` | Re-register Telegram native command menus. |
 
 Examples:
 

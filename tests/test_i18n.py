@@ -98,7 +98,7 @@ def test_persisted_language_is_used_by_menu_builder(tmp_path) -> None:
         for button in row
     ]
 
-    assert text("menu_open_url", "fa") in labels
+    assert text("menu_new_url", "fa") in labels
     assert text("menu_search", "fa") in labels
 
 

@@ -36,6 +36,13 @@ class URLSession:
     created_at: datetime
     cancelled: bool = False
     last_message_id: int | None = None
+    title: str | None = None
+    history: tuple[str, ...] = ()
+    updated_at: datetime | None = None
+
+    @property
+    def current_url(self) -> str:
+        return self.url
 
 
 class URLSessionStore:
@@ -73,6 +80,13 @@ class URLSessionStore:
                         if item.get("last_message_id") is not None
                         else None
                     ),
+                    title=str(item["title"]) if item.get("title") else None,
+                    history=tuple(str(value) for value in item.get("history", [])),
+                    updated_at=(
+                        datetime.fromisoformat(str(item["updated_at"]))
+                        if item.get("updated_at")
+                        else None
+                    ),
                 )
             except (KeyError, TypeError, ValueError):
                 continue
@@ -89,7 +103,12 @@ class URLSessionStore:
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
         payload = {
             "sessions": [
-                {**asdict(item), "created_at": item.created_at.isoformat()}
+                {
+                    **asdict(item),
+                    "created_at": item.created_at.isoformat(),
+                    "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+                    "history": list(item.history),
+                }
                 for item in sessions
             ]
         }
@@ -111,6 +130,7 @@ class URLSessionStore:
                 user_id=user_id,
                 url=url,
                 created_at=now or datetime.now(UTC),
+                updated_at=now or datetime.now(UTC),
             )
             self._sessions[session_id] = session
             self._save()
@@ -155,6 +175,7 @@ class URLSessionStore:
                 session,
                 created_at=now or datetime.now(UTC),
                 last_message_id=message_id or session.last_message_id,
+                updated_at=now or datetime.now(UTC),
             )
             self._sessions[session_id] = updated
             self._save()
@@ -171,6 +192,50 @@ class URLSessionStore:
 
     def remove(self, session_id: str, user_id: int) -> bool:
         return self.cancel(session_id, user_id)
+
+    def navigate(
+        self,
+        session_id: str,
+        user_id: int,
+        url: str,
+        title: str | None = None,
+        now: datetime | None = None,
+    ) -> URLSession | None:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None or session.user_id != user_id or session.cancelled:
+                return None
+            updated = replace(
+                session,
+                url=url,
+                title=title,
+                history=(*session.history, session.url),
+                updated_at=now or datetime.now(UTC),
+            )
+            self._sessions[session_id] = updated
+            self._save()
+            return updated
+
+    def back(self, session_id: str, user_id: int, now: datetime | None = None) -> URLSession | None:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if (
+                session is None
+                or session.user_id != user_id
+                or session.cancelled
+                or not session.history
+            ):
+                return None
+            updated = replace(
+                session,
+                url=session.history[-1],
+                history=session.history[:-1],
+                title=None,
+                updated_at=now or datetime.now(UTC),
+            )
+            self._sessions[session_id] = updated
+            self._save()
+            return updated
 
 
 _settings = get_settings()

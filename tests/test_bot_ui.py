@@ -1,6 +1,11 @@
 import pytest
 
-from app.bot.handlers import HELP_TEXT
+from app.bot.handlers import (
+    HELP_TEXT,
+    begin_user_input,
+    consume_user_input,
+    pending_user_inputs,
+)
 from app.bot.i18n import text
 from app.bot.ui import (
     URL_ACTIONS,
@@ -64,12 +69,12 @@ def test_about_text_contains_version_and_runtime_without_secrets() -> None:
     about = text(
         "about",
         "en",
-        version="1.6.0-alpha.1",
+        version="1.7.0-alpha.1",
         runtime_target="Linux/Ubuntu 24.04 or Docker",
     )
 
     assert "Telegram Browser Bot" in about
-    assert "1.6.0-alpha.1" in about
+    assert "1.7.0-alpha.1" in about
     assert "Linux/Ubuntu 24.04 or Docker" in about
     assert "TOKEN" not in about
 
@@ -81,11 +86,12 @@ def test_persian_menu_button_labels() -> None:
         for button in row
     ]
 
-    assert text("menu_open_url", "fa") in labels
+    assert text("menu_new_url", "fa") in labels
     assert text("menu_sessions", "fa") in labels
-    assert text("menu_account", "fa") in labels
+    assert text("menu_recent_jobs", "fa") in labels
     assert text("menu_help", "fa") in labels
     assert text("menu_search", "fa") in labels
+    assert text("menu_language", "fa") in labels
 
 
 def test_persian_url_action_button_labels() -> None:
@@ -103,5 +109,16 @@ def test_persian_url_action_button_labels() -> None:
         text("url_links_button", "fa"),
         text("url_download_button", "fa"),
         text("url_refresh_button", "fa"),
+        text("url_back_button", "fa"),
+        text("url_interact_button", "fa"),
         text("url_cancel_button", "fa"),
     ]
+
+
+@pytest.mark.parametrize("mode", ["search", "url"])
+def test_button_first_input_flow_state(mode: str) -> None:
+    pending_user_inputs.clear()
+    begin_user_input(123, mode)
+
+    assert consume_user_input(123) == mode
+    assert consume_user_input(123) is None

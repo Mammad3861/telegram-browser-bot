@@ -8,12 +8,16 @@ from urllib.parse import unquote, urlparse
 SUPPORTED_EXTENSIONS = {
     "pdf", "zip", "rar", "7z", "tar", "gz", "mp4", "mkv", "mp3", "wav",
     "jpg", "jpeg", "png", "webp", "doc", "docx", "xls", "xlsx", "ppt",
-    "pptx", "csv", "json", "xml", "txt",
+    "pptx", "csv", "json", "xml", "txt", "msi", "exe", "dmg", "pkg",
+    "deb", "rpm", "tgz",
 }
 
 DOWNLOADABLE_CONTENT_TYPES = {
     "application/7z-compressed",
     "application/gzip",
+    "application/zip",
+    "application/x-gzip",
+    "application/x-rpm",
     "application/json",
     "application/msword",
     "application/pdf",
@@ -27,6 +31,10 @@ DOWNLOADABLE_CONTENT_TYPES = {
     "application/x-rar-compressed",
     "application/x-tar",
     "application/xml",
+    "application/octet-stream",
+    "application/x-msdownload",
+    "application/x-apple-diskimage",
+    "application/vnd.debian.binary-package",
     "audio/mpeg",
     "audio/wav",
     "image/jpeg",
@@ -71,12 +79,14 @@ def is_direct_file(
             return extension in SUPPORTED_EXTENSIONS
 
     extension = url_extension(url)
-    if extension:
-        return extension in SUPPORTED_EXTENSIONS
+    if extension in SUPPORTED_EXTENSIONS:
+        return True
 
     if content_disposition and "attachment" in content_disposition.lower():
         return True
     media_type = (content_type or "").split(";", 1)[0].strip().lower()
+    if media_type in {"text/html", "application/xhtml+xml"}:
+        return False
     return media_type in DOWNLOADABLE_CONTENT_TYPES
 
 

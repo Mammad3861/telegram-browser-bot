@@ -20,6 +20,8 @@ PROTECTED_MEDIA_DOMAINS = {
     "soundcloud.com",
     "music.apple.com",
 }
+BUILTIN_ADULT_DOMAINS = {"pornhub.com", "xvideos.com", "xnxx.com"}
+BUILTIN_GAMBLING_DOMAINS = {"bet365.com", "stake.com", "1xbet.com"}
 CATEGORY_FIELDS = {
     "media": "media_domains",
     "gambling": "gambling_domains",
@@ -165,6 +167,28 @@ def load_content_policy(path: Path, default_action: str = "allow") -> ContentPol
     policy.updated_at = str(payload.get("updated_at") or policy.updated_at)
     policy.default_action = str(payload.get("default_action") or default_action).lower()
     return policy
+
+
+def apply_builtin_safety_lists(
+    policy: ContentPolicy, block_adult: bool = True, block_gambling: bool = True
+) -> ContentPolicy:
+    if block_adult:
+        policy.adult_domains = sorted(set(policy.adult_domains) | BUILTIN_ADULT_DOMAINS)
+    if block_gambling:
+        policy.gambling_domains = sorted(
+            set(policy.gambling_domains) | BUILTIN_GAMBLING_DOMAINS
+        )
+    return policy
+
+
+def check_query_allowed(query: str, policy: ContentPolicy) -> PolicyDecision:
+    normalized = " ".join(query.lower().split())
+    keyword = next(
+        (value for value in policy.blocked_keywords if value.lower() in normalized), None
+    )
+    if keyword:
+        return PolicyDecision(False, "blocked_keyword", matched_rule=keyword)
+    return PolicyDecision(True, "default_allow")
 
 
 def save_content_policy(path: Path, policy: ContentPolicy) -> None:

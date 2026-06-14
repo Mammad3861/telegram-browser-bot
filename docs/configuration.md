@@ -13,10 +13,12 @@ Configuration is loaded from environment variables and `.env`. Defaults below ma
 | `ENABLE_RUNTIME_ACCESS_MANAGEMENT` | `true` | Enables `/allow`, `/deny`, and `/allowed_users`. |
 | `REGISTER_BOT_COMMANDS` | `true` | Registers Telegram native command menus at startup. |
 | `FORCE_PERSIAN_COMMAND_MENU` | `false` | Uses Persian descriptions for the no-language default command menu. |
+| `COMMAND_MENU_LANGUAGE_MODE` | `auto` | Native menu mode: `auto`, `force_fa`, or `force_en`. |
+| `RESET_TELEGRAM_COMMANDS_ON_START` | `false` | Deletes old default and Persian command lists before registration. |
 
 Admins always have protected-command access. Static and runtime allowlists are combined. If both are empty, only admins can use protected commands.
 
-Telegram chooses localized native command descriptions using the Telegram client's language and Bot API `language_code`; this is independent of the bot's `/language` preference. Set `FORCE_PERSIAN_COMMAND_MENU=true` only when the bot is primarily intended for Persian users and the no-language fallback should also be Persian.
+Telegram chooses localized native command descriptions using the Telegram client's language and Bot API `language_code`; this is independent of the bot's `/language` preference. For mainly Persian deployments, set `COMMAND_MENU_LANGUAGE_MODE=force_fa`. `FORCE_PERSIAN_COMMAND_MENU` remains as a compatibility setting.
 
 ## HTTP And Browser
 
@@ -32,6 +34,8 @@ Telegram chooses localized native command descriptions using the Telegram client
 | `PDF_FORMAT` | `A4` | Playwright PDF paper format. |
 | `PDF_PRINT_BACKGROUND` | `true` | Include backgrounds in PDFs. |
 | `RENDERED_HTML_WAIT_UNTIL` | `domcontentloaded` | Rendered HTML navigation load state. |
+| `INTERACTION_MAX_ELEMENTS` | `10` | Maximum visible links/buttons shown by Interact. |
+| `INTERACTION_TIMEOUT_SECONDS` | `30` | Playwright timeout for page interaction. |
 
 ## Downloads And Storage
 
@@ -88,6 +92,9 @@ Active jobs remain in memory. Only safe completed-job summaries are persisted, u
 | `CONTENT_POLICY_PATH` | `downloads/policies/content_policy.json` | Atomic local domain/category policy store. |
 | `ENABLE_CONTENT_POLICY` | `true` | Enforces policy before cards, fetches, downloads, and browser jobs. |
 | `CONTENT_POLICY_DEFAULT_ACTION` | `allow` | Action for domains without a matching rule: `allow` or `block`. |
+| `ENABLE_BUILTIN_SAFETY_BLOCKLIST` | `true` | Enables the small built-in adult/gambling seed lists. |
+| `BUILTIN_BLOCK_ADULT` | `true` | Enables built-in adult-domain seeds. |
+| `BUILTIN_BLOCK_GAMBLING` | `true` | Enables built-in gambling-domain seeds. |
 
 The policy supports explicit blocked/allowed domains, blocked keywords, and lightweight domain lists for media, gambling, adult, and dangerous categories. Explicit allow rules override category rules, but never override URL validation or private/internal destination protection. No external classification service is called.
 

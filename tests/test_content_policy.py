@@ -5,6 +5,8 @@ from app.core.content_policy import (
     classify_domain,
     load_content_policy,
     normalize_domain,
+    apply_builtin_safety_lists,
+    check_query_allowed,
 )
 
 
@@ -59,6 +61,19 @@ def test_default_block_action_blocks_unmatched_domains() -> None:
     policy = ContentPolicy(default_action="block")
 
     assert classify_domain("example.com", policy).allowed is False
+
+
+def test_policy_blocks_search_query_by_keyword() -> None:
+    policy = ContentPolicy(blocked_keywords=["blocked phrase"])
+
+    assert check_query_allowed("find BLOCKED phrase now", policy).allowed is False
+
+
+def test_builtin_adult_and_gambling_domains_are_filtered() -> None:
+    policy = apply_builtin_safety_lists(ContentPolicy())
+
+    assert classify_domain("www.pornhub.com", policy).allowed is False
+    assert classify_domain("sports.bet365.com", policy).allowed is False
 
 
 def test_url_policy_decision_preserves_url_validation() -> None:

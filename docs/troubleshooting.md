@@ -33,6 +33,12 @@ python -m playwright install chromium
 
 Some sites block headless browsers or require JavaScript, authentication, or CAPTCHA completion. The bot does not bypass these controls.
 
+Page interaction is intentionally limited to visible links and simple buttons. It does not fill forms, submit passwords, pass CAPTCHAs, bypass paywalls, or bypass DRM. Some sites therefore cannot work fully inside Telegram or a headless browser.
+
+## Direct Download Rejected
+
+Direct Download accepts direct file links only. The bot checks redirects, headers, content type, disposition, and common file extensions. A normal HTML page is rejected even if that page contains links to files.
+
 ## Search Unavailable
 
 `duckduckgo_html` is a basic alpha provider and can fail because of upstream changes, rate limits, or network restrictions. Try again later or send a direct URL to use the normal action card. Check `SEARCH_PROVIDER` and container logs.
@@ -41,7 +47,7 @@ Some sites block headless browsers or require JavaScript, authentication, or CAP
 
 Telegram's native bottom command menu follows the Telegram client's language and the Bot API command `language_code`. It does not follow the language selected with the bot's `/language` command.
 
-English descriptions are registered as the no-language default and Persian descriptions are registered with `language_code="fa"`. For a primarily Persian bot, set `FORCE_PERSIAN_COMMAND_MENU=true` to make Persian descriptions the no-language default as well.
+In `auto` mode, English descriptions are the no-language default and Persian descriptions use `language_code="fa"`. For a primarily Persian bot, set `COMMAND_MENU_LANGUAGE_MODE=force_fa`, restart, or run `/refresh_commands`. Use `RESET_TELEGRAM_COMMANDS_ON_START=true` once when stale command lists need to be removed before registration.
 
 Telegram clients may cache command menu updates. Confirm `REGISTER_BOT_COMMANDS=true`, restart the bot, then reopen the chat or restart the Telegram client. Command registration failures are warnings and do not stop polling.
 

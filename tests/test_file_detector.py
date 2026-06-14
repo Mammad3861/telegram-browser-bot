@@ -18,9 +18,11 @@ def test_detects_file_from_content_type() -> None:
 
 def test_normal_html_page_is_not_a_direct_file() -> None:
     assert not is_direct_file("https://example.com/page", "text/html; charset=utf-8", None)
-    assert not is_direct_file(
-        "https://example.com/file.exe", "application/octet-stream", None
-    )
+    assert is_direct_file("https://example.com/file.exe", "application/octet-stream", None)
+
+
+def test_detects_installer_url_extensions() -> None:
+    assert is_direct_file("https://example.com/putty-installer.msi", "text/html", None)
 
 
 def test_extracts_filename_from_content_disposition() -> None:

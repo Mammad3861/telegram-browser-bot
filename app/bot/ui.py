@@ -15,6 +15,8 @@ URL_ACTIONS = {
     "links",
     "download",
     "refresh",
+    "back",
+    "interact",
     "cancel",
 }
 
@@ -57,22 +59,24 @@ def parse_url_callback_data(value: str | None) -> URLCallback | None:
 
 def menu_keyboard(language: str = "en") -> InlineKeyboardMarkup:
     labels = {
-        "open": text("menu_open_url", language),
+        "open": text("menu_new_url", language),
         "sessions": text("menu_sessions", language),
-        "account": text("menu_account", language),
+        "account": text("menu_recent_jobs", language),
         "help": text("menu_help", language),
         "search": text("menu_search", language),
+        "language": text("menu_language", language),
     }
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text=labels["search"], callback_data="menu:search")],
             [InlineKeyboardButton(text=labels["open"], callback_data="menu:open_url")],
             [
                 InlineKeyboardButton(text=labels["sessions"], callback_data="menu:sessions"),
-                InlineKeyboardButton(text=labels["account"], callback_data="menu:account"),
+                InlineKeyboardButton(text=labels["account"], callback_data="menu:jobs"),
             ],
             [
+                InlineKeyboardButton(text=labels["language"], callback_data="menu:language"),
                 InlineKeyboardButton(text=labels["help"], callback_data="menu:help"),
-                InlineKeyboardButton(text=labels["search"], callback_data="menu:search"),
             ],
         ]
     )
@@ -87,6 +91,8 @@ def url_action_keyboard(session_id: str, language: str = "en") -> InlineKeyboard
         "links": text("url_links_button", language),
         "download": text("url_download_button", language),
         "refresh": text("url_refresh_button", language),
+        "back": text("url_back_button", language),
+        "interact": text("url_interact_button", language),
         "cancel": text("url_cancel_button", language),
     }
     button = lambda label, action: InlineKeyboardButton(
@@ -97,6 +103,23 @@ def url_action_keyboard(session_id: str, language: str = "en") -> InlineKeyboard
             [button(labels["screenshot"], "screenshot"), button(labels["pdf"], "pdf")],
             [button(labels["html"], "html"), button(labels["rendered_html"], "rendered_html")],
             [button(labels["links"], "links"), button(labels["download"], "download")],
-            [button(labels["refresh"], "refresh"), button(labels["cancel"], "cancel")],
+            [button(labels["refresh"], "refresh"), button(labels["back"], "back")],
+            [button(labels["interact"], "interact"), button(labels["cancel"], "cancel")],
+        ]
+    )
+
+
+def interaction_keyboard(
+    session_id: str, labels: list[str]
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"{index + 1}. {label[:48]}",
+                    callback_data=f"interact:{session_id}:{index}",
+                )
+            ]
+            for index, label in enumerate(labels)
         ]
     )
