@@ -64,12 +64,12 @@ def test_about_text_contains_version_and_runtime_without_secrets() -> None:
     about = text(
         "about",
         "en",
-        version="1.5.1-alpha.1",
+        version="1.5.2-alpha.1",
         runtime_target="Linux/Ubuntu 24.04 or Docker",
     )
 
     assert "Telegram Browser Bot" in about
-    assert "1.5.1-alpha.1" in about
+    assert "1.5.2-alpha.1" in about
     assert "Linux/Ubuntu 24.04 or Docker" in about
     assert "TOKEN" not in about
 

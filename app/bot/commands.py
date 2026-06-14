@@ -79,8 +79,9 @@ async def register_bot_commands(bot: Bot, settings: Settings) -> bool:
         return False
 
     try:
+        default_language = "fa" if settings.force_persian_command_menu else "en"
         await bot.set_my_commands(
-            build_default_commands("en"), scope=BotCommandScopeDefault()
+            build_default_commands(default_language), scope=BotCommandScopeDefault()
         )
         await bot.set_my_commands(
             build_default_commands("fa"),

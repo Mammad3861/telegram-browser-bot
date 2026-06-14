@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     delete_generated_files_after_send: bool = True
     url_session_ttl_minutes: int = 60
     register_bot_commands: bool = True
+    force_persian_command_menu: bool = False
     search_provider: str = "duckduckgo_html"
     search_results_limit: int = 5
     search_timeout_seconds: float = 15.0

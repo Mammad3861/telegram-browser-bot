@@ -35,6 +35,22 @@ def test_default_command_list_builder() -> None:
     assert commands[1].description == "Open interactive menu"
 
 
+def test_persian_default_command_list_builder() -> None:
+    commands = build_default_commands("fa")
+
+    assert [command.command for command in commands] == [
+        "start",
+        "menu",
+        "search",
+        "help",
+        "language",
+        "about",
+        "sessions",
+        "whoami",
+    ]
+    assert commands[1].description == "باز کردن منوی اصلی"
+
+
 def test_admin_command_list_builder() -> None:
     commands = build_admin_commands("en")
 
@@ -50,6 +66,24 @@ def test_admin_command_list_builder() -> None:
         "reset_text",
         "preview_text",
     ]
+
+
+def test_persian_admin_command_list_builder() -> None:
+    commands = build_admin_commands("fa")
+
+    assert [command.command for command in commands] == [
+        "admin_status",
+        "allowed_users",
+        "allow",
+        "deny",
+        "cleanup",
+        "purge_history",
+        "texts",
+        "set_text",
+        "reset_text",
+        "preview_text",
+    ]
+    assert commands[0].description == "نمایش وضعیت اجرا"
 
 
 def test_persian_command_descriptions() -> None:
@@ -85,10 +119,34 @@ def test_registration_includes_default_localized_and_admin_scopes() -> None:
     assert result is True
     assert len(bot.calls) == 6
     assert bot.calls[0].get("language_code") is None
+    assert bot.calls[0]["commands"][1].description == "Open interactive menu"
     assert bot.calls[1]["language_code"] == "fa"
+    assert bot.calls[1]["commands"][1].description == "باز کردن منوی اصلی"
     admin_calls = bot.calls[2:]
     assert {call["scope"].chat_id for call in admin_calls} == {123, 456}
     assert all(len(call["commands"]) == 18 for call in admin_calls)
+    assert all(
+        call["commands"][0].description == (
+            "شروع ربات" if call.get("language_code") == "fa" else "Start the bot"
+        )
+        for call in admin_calls
+    )
+
+
+def test_force_persian_command_menu_uses_persian_for_no_language_default() -> None:
+    bot = FakeBot()
+    settings = Settings(
+        _env_file=None,
+        register_bot_commands=True,
+        force_persian_command_menu=True,
+    )
+
+    result = asyncio.run(register_bot_commands(bot, settings))  # type: ignore[arg-type]
+
+    assert result is True
+    assert bot.calls[0].get("language_code") is None
+    assert bot.calls[0]["commands"][1].description == "باز کردن منوی اصلی"
+    assert bot.calls[1]["language_code"] == "fa"
 
 
 def test_disabled_registration_makes_no_api_calls() -> None:

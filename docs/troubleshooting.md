@@ -39,7 +39,11 @@ Some sites block headless browsers or require JavaScript, authentication, or CAP
 
 ## Telegram Command Menu Cache
 
-Telegram clients may cache the native command menu. Confirm `REGISTER_BOT_COMMANDS=true`, restart the bot, then reopen the chat or restart the Telegram client. Command registration failures are warnings and do not stop polling.
+Telegram's native bottom command menu follows the Telegram client's language and the Bot API command `language_code`. It does not follow the language selected with the bot's `/language` command.
+
+English descriptions are registered as the no-language default and Persian descriptions are registered with `language_code="fa"`. For a primarily Persian bot, set `FORCE_PERSIAN_COMMAND_MENU=true` to make Persian descriptions the no-language default as well.
+
+Telegram clients may cache command menu updates. Confirm `REGISTER_BOT_COMMANDS=true`, restart the bot, then reopen the chat or restart the Telegram client. Command registration failures are warnings and do not stop polling.
 
 ## HTTP And Network Problems
 

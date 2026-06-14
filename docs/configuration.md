@@ -12,8 +12,11 @@ Configuration is loaded from environment variables and `.env`. Defaults below ma
 | `ACCESS_STORAGE_PATH` | `downloads/access/allowed_users.json` | Runtime allowlist file. |
 | `ENABLE_RUNTIME_ACCESS_MANAGEMENT` | `true` | Enables `/allow`, `/deny`, and `/allowed_users`. |
 | `REGISTER_BOT_COMMANDS` | `true` | Registers Telegram native command menus at startup. |
+| `FORCE_PERSIAN_COMMAND_MENU` | `false` | Uses Persian descriptions for the no-language default command menu. |
 
 Admins always have protected-command access. Static and runtime allowlists are combined. If both are empty, only admins can use protected commands.
+
+Telegram chooses localized native command descriptions using the Telegram client's language and Bot API `language_code`; this is independent of the bot's `/language` preference. Set `FORCE_PERSIAN_COMMAND_MENU=true` only when the bot is primarily intended for Persian users and the no-language fallback should also be Persian.
 
 ## HTTP And Browser
 

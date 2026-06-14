@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.5.2-alpha.1] - 2026-06-15
+
+### Fixed
+
+- Polished English and Persian descriptions in Telegram's native command menu.
+- Verified localized default and per-admin chat command scopes.
+- Added `FORCE_PERSIAN_COMMAND_MENU` for Persian-first no-language command menus.
+- Documented that Telegram command-menu language is independent from `/language` and may be cached by clients.
+
 ## [v1.5.1-alpha.1] - 2026-06-15
 
 ### Fixed
