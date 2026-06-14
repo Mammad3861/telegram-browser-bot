@@ -51,9 +51,11 @@ Cleanup only targets generated `html`, `html_rendered`, `files`, `screenshots`, 
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `SEARCH_PROVIDER` | `duckduckgo_html` | Search provider; use `disabled` to turn search off. |
+| `SEARCH_PROVIDER` | `duckduckgo_html` | `disabled`, `duckduckgo_html`, `brave_api`, or `searxng`. |
 | `SEARCH_RESULTS_LIMIT` | `5` | Maximum displayed results. |
 | `SEARCH_TIMEOUT_SECONDS` | `15` | Provider request timeout. |
+| `BRAVE_SEARCH_API_KEY` | empty | Required when `SEARCH_PROVIDER=brave_api`. |
+| `SEARXNG_BASE_URL` | empty | Required when `SEARCH_PROVIDER=searxng`. |
 | `SEARCH_QUERY_MAX_LENGTH` | `200` | Maximum query length. |
 | `SEARCH_SESSION_TTL_MINUTES` | `30` | Search result card lifetime. |
 

@@ -40,7 +40,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "search_unavailable": (
             "Search is temporarily unavailable. Try again later or send a direct URL."
         ),
-        "search_no_results": "No safe search results were found.",
+        "search_disabled": "Web search is disabled. You can still send a direct URL.",
+        "search_misconfigured": (
+            "Search is not configured correctly. Please contact the bot owner or send a direct URL."
+        ),
+        "search_no_results": (
+            "No safe results were found. Try different words or send a direct URL."
+        ),
+        "search_source": "Source: {provider}",
+        "search_partial_results": "Showing {count} of up to {requested} requested results.",
         "search_results": "🔎 Results for: {query}",
         "search_expired": "This search session expired. Please search again.",
         "search_not_owned": "This search session belongs to another user.",
@@ -102,7 +110,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "search_unavailable": (
             "جست‌وجو موقتاً در دسترس نیست. بعداً دوباره تلاش کنید یا یک نشانی مستقیم بفرستید."
         ),
-        "search_no_results": "نتیجه امنی برای جست‌وجو پیدا نشد.",
+        "search_disabled": "جست‌وجوی وب غیرفعال است. همچنان می‌توانید یک نشانی مستقیم بفرستید.",
+        "search_misconfigured": (
+            "جست‌وجو درست پیکربندی نشده است. با مالک ربات تماس بگیرید یا یک نشانی مستقیم بفرستید."
+        ),
+        "search_no_results": (
+            "نتیجه امنی پیدا نشد. عبارت دیگری امتحان کنید یا یک نشانی مستقیم بفرستید."
+        ),
+        "search_source": "منبع: {provider}",
+        "search_partial_results": "{count} نتیجه از حداکثر {requested} نتیجه درخواستی نمایش داده می‌شود.",
         "search_results": "🔎 نتایج برای: {query}",
         "search_expired": "نشست جست‌وجو منقضی شده است. دوباره جست‌وجو کنید.",
         "search_not_owned": "این نشست جست‌وجو متعلق به کاربر دیگری است.",

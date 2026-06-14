@@ -86,7 +86,13 @@ from app.fetchers.file_downloader import DownloadError, FileDownloader
 from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
 from app.version import APP_VERSION
-from app.search.providers import SearchResult, search_web
+from app.search.providers import (
+    SearchConfigurationError,
+    SearchDisabledError,
+    SearchResult,
+    provider_display_name,
+    search_web,
+)
 from app.search.service import (
     SearchQueryError,
     filter_safe_search_results,
@@ -231,6 +237,8 @@ async def perform_search(query: str) -> list[SearchResult]:
         query,
         limit,
         settings.search_timeout_seconds,
+        settings.brave_search_api_key,
+        settings.searxng_base_url,
     )
     return filter_safe_search_results(results, limit)
 
@@ -243,9 +251,25 @@ async def send_search_results(
         await message.answer(text("search_no_results", language))
         return
     session = search_session_store.create(user_id, query, results)
+    settings = get_settings()
+    requested = max(1, min(settings.search_results_limit, 5))
+    provider = provider_display_name(results[0].source if results else settings.search_provider)
     await message.answer(
         format_search_results(
-            query, results, text("search_results", language, query=query)
+            query,
+            results,
+            text("search_results", language, query=query),
+            text("search_source", language, provider=provider),
+            (
+                text(
+                    "search_partial_results",
+                    language,
+                    count=len(results),
+                    requested=requested,
+                )
+                if len(results) < requested
+                else None
+            ),
         ),
         reply_markup=search_results_keyboard(
             session.session_id, len(results), language
@@ -279,6 +303,11 @@ async def search_handler(message: Message, command: CommandObject) -> None:
         return
     try:
         await send_search_results(message, user_id, query, language)
+    except SearchDisabledError:
+        await message.answer(text("search_disabled", language))
+    except SearchConfigurationError:
+        logger.warning("Search provider is misconfigured")
+        await message.answer(text("search_misconfigured", language))
     except Exception as exc:
         logger.warning("Search failed: exception_type=%s", type(exc).__name__)
         await message.answer(text("search_unavailable", language))
@@ -346,11 +375,34 @@ async def search_callback_handler(callback: CallbackQuery) -> None:
                 updated.query,
                 updated.results,
                 text("search_results", language, query=updated.query),
+                text(
+                    "search_source",
+                    language,
+                    provider=provider_display_name(updated.results[0].source),
+                ),
+                (
+                    text(
+                        "search_partial_results",
+                        language,
+                        count=len(updated.results),
+                        requested=max(
+                            1, min(get_settings().search_results_limit, 5)
+                        ),
+                    )
+                    if len(updated.results)
+                    < max(1, min(get_settings().search_results_limit, 5))
+                    else None
+                ),
             ),
             reply_markup=search_results_keyboard(
                 updated.session_id, len(updated.results), language
             ),
         )
+    except SearchDisabledError:
+        await message.answer(text("search_disabled", language))
+    except SearchConfigurationError:
+        logger.warning("Search provider is misconfigured during refresh")
+        await message.answer(text("search_misconfigured", language))
     except Exception as exc:
         logger.warning("Search refresh failed: exception_type=%s", type(exc).__name__)
         await message.answer(text("search_unavailable", language))

@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.5.0-alpha.1] - 2026-06-14
+
+### Added
+
+- Registry-backed search providers: `disabled`, `duckduckgo_html`, `brave_api`, and `searxng`.
+- Brave Search API integration with secret-safe configuration handling.
+- SearxNG JSON API integration with configurable base URL.
+- Provider labels and partial-result counts on English and Persian search cards.
+
+### Reliability And Safety
+
+- Hardened DuckDuckGo timeout handling and added a parsing fallback.
+- Misconfigured or unavailable providers return safe, friendly messages.
+- All provider result URLs continue through the existing URL and SSRF validation.
+- No Google scraping, CAPTCHA bypass, OpenAI integration, database, or Redis was added.
+
 ## [v1.4.1-alpha.1] - 2026-06-14
 
 ### Documentation

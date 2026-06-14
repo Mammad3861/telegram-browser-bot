@@ -82,9 +82,17 @@ def search_results_keyboard(
 
 
 def format_search_results(
-    query: str, results: tuple[SearchResult, ...] | list[SearchResult], heading: str
+    query: str,
+    results: tuple[SearchResult, ...] | list[SearchResult],
+    heading: str,
+    source_line: str | None = None,
+    partial_line: str | None = None,
 ) -> str:
     lines = [heading]
+    if source_line:
+        lines.append(source_line)
+    if partial_line:
+        lines.append(partial_line)
     for index, result in enumerate(results, start=1):
         domain = urlparse(result.url).hostname or result.url
         lines.extend(["", f"{index}. {result.title}", f"   {domain}"])

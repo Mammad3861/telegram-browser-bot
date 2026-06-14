@@ -1,10 +1,12 @@
 import pytest
 
 from app.search.ui import (
+    format_search_results,
     parse_search_callback_data,
     search_callback_data,
     search_results_keyboard,
 )
+from app.search.providers import SearchResult
 
 
 @pytest.mark.parametrize(
@@ -42,3 +44,15 @@ def test_search_callback_data_stays_within_telegram_limit() -> None:
 def test_invalid_search_callback_data_is_rejected(value) -> None:
     assert parse_search_callback_data(value) is None
 
+
+def test_search_result_card_includes_provider_and_partial_count() -> None:
+    card = format_search_results(
+        "example",
+        [SearchResult("Example", "https://example.com", source="brave_api")],
+        "Results for: example",
+        "Source: Brave",
+        "Showing 1 of up to 5 requested results.",
+    )
+
+    assert "Source: Brave" in card
+    assert "Showing 1 of up to 5 requested results." in card

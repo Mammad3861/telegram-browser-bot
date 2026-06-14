@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     search_provider: str = "duckduckgo_html"
     search_results_limit: int = 5
     search_timeout_seconds: float = 15.0
+    brave_search_api_key: str = ""
+    searxng_base_url: str = ""
     search_query_max_length: int = 200
     search_session_ttl_minutes: int = 30
     user_preferences_path: str = "downloads/preferences/user_preferences.json"
