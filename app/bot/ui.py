@@ -4,6 +4,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.core.command_args import CommandArgumentError, parse_single_url_arg
 from app.core.url_validation import URLValidationError, validate_url
+from app.bot.i18n import text
 
 
 URL_ACTIONS = {
@@ -55,23 +56,13 @@ def parse_url_callback_data(value: str | None) -> URLCallback | None:
 
 
 def menu_keyboard(language: str = "en") -> InlineKeyboardMarkup:
-    labels = (
-        {
-            "open": "🌐 باز کردن نشانی",
-            "sessions": "🍪 نشست‌ها",
-            "account": "⚙️ حساب",
-            "help": "❓ راهنما",
-            "search": "🔎 جست‌وجوی وب",
-        }
-        if language == "fa"
-        else {
-            "open": "🌐 Open URL",
-            "sessions": "🍪 Sessions",
-            "account": "⚙️ Account",
-            "help": "❓ Help",
-            "search": "🔎 Search Web",
-        }
-    )
+    labels = {
+        "open": text("menu_open_url", language),
+        "sessions": text("menu_sessions", language),
+        "account": text("menu_account", language),
+        "help": text("menu_help", language),
+        "search": text("menu_search", language),
+    }
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=labels["open"], callback_data="menu:open_url")],
@@ -88,29 +79,16 @@ def menu_keyboard(language: str = "en") -> InlineKeyboardMarkup:
 
 
 def url_action_keyboard(session_id: str, language: str = "en") -> InlineKeyboardMarkup:
-    labels = (
-        {
-            "screenshot": "🖼 تصویر",
-            "pdf": "🧾 PDF",
-            "html": "📄 HTML",
-            "rendered_html": "🌐 HTML رندرشده",
-            "links": "🔗 پیوندها",
-            "download": "⬇️ دانلود",
-            "refresh": "🔄 تازه‌سازی",
-            "cancel": "❌ لغو",
-        }
-        if language == "fa"
-        else {
-            "screenshot": "🖼 Screenshot",
-            "pdf": "🧾 PDF",
-            "html": "📄 HTML",
-            "rendered_html": "🌐 Rendered HTML",
-            "links": "🔗 Links",
-            "download": "⬇️ Download",
-            "refresh": "🔄 Refresh",
-            "cancel": "❌ Cancel",
-        }
-    )
+    labels = {
+        "screenshot": text("url_screenshot_button", language),
+        "pdf": text("url_pdf_button", language),
+        "html": text("url_html_button", language),
+        "rendered_html": text("url_rendered_html_button", language),
+        "links": text("url_links_button", language),
+        "download": text("url_download_button", language),
+        "refresh": text("url_refresh_button", language),
+        "cancel": text("url_cancel_button", language),
+    }
     button = lambda label, action: InlineKeyboardButton(
         text=label, callback_data=url_callback_data(session_id, action)
     )

@@ -29,6 +29,10 @@ def test_text_lookup_supports_english_and_persian() -> None:
     assert text("menu", "fa") == TEXTS["fa"]["menu"]
 
 
+def test_all_english_keys_have_persian_equivalents() -> None:
+    assert set(TEXTS["en"]) == set(TEXTS["fa"])
+
+
 def test_missing_persian_key_falls_back_to_english(monkeypatch) -> None:
     monkeypatch.delitem(TEXTS["fa"], "help")
 
@@ -80,6 +84,22 @@ def test_editable_bot_text_overrides_and_falls_back(tmp_path, monkeypatch) -> No
 def test_admin_text_flow_has_persian_translations(key: str) -> None:
     assert key in TEXTS["fa"]
     assert TEXTS["fa"][key] != TEXTS["en"][key]
+
+
+def test_persisted_language_is_used_by_menu_builder(tmp_path) -> None:
+    from app.bot.ui import menu_keyboard
+
+    path = tmp_path / "preferences.json"
+    set_language(123, "fa", path)
+    language = get_language(123, path)
+    labels = [
+        button.text
+        for row in menu_keyboard(language).inline_keyboard
+        for button in row
+    ]
+
+    assert text("menu_open_url", "fa") in labels
+    assert text("menu_search", "fa") in labels
 
 
 def test_admin_text_translation_falls_back_to_english(monkeypatch) -> None:

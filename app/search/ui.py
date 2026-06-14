@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.search.providers import SearchResult
+from app.bot.i18n import text
 
 
 SEARCH_ACTIONS = {"open", "refresh", "close"}
@@ -61,9 +62,8 @@ def search_results_keyboard(
         for index in range(result_count)
     ]
     controls = (
-        ("🔄 جست‌وجوی دوباره", "❌ بستن")
-        if language == "fa"
-        else ("🔄 Search again", "❌ Close")
+        text("search_again_button", language),
+        text("close_button", language),
     )
     rows = [number_buttons] if number_buttons else []
     rows.append(

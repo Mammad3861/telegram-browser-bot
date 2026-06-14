@@ -17,7 +17,7 @@ from app.core.access_store import (
 )
 from app.core.download_quota import download_quota
 from app.core.cookies import CookieValidationError, normalize_domain, validate_cookies_json
-from app.core.command_args import CommandArgumentError, parse_single_url_arg, url_usage
+from app.core.command_args import CommandArgumentError, parse_single_url_arg
 from app.core.cleanup import cleanup_generated_files
 from app.core.bot_text_store import (
     BotTextValidationError,
@@ -115,7 +115,6 @@ logger = logging.getLogger(__name__)
 
 HELP_TEXT = text("help", "en")
 
-ADMIN_REQUIRED = "Admin access required."
 pending_cookie_imports: dict[int, str] = {}
 
 
@@ -317,7 +316,9 @@ async def search_handler(message: Message, command: CommandObject) -> None:
 async def search_callback_handler(callback: CallbackQuery) -> None:
     parsed = parse_search_callback_data(callback.data)
     if parsed is None:
-        await callback.answer("Invalid action", show_alert=True)
+        await callback.answer(
+            text("invalid_action", get_language(callback.from_user.id)), show_alert=True
+        )
         return
     user_id = callback.from_user.id
     language = get_language(user_id)
@@ -422,7 +423,9 @@ async def create_url_card(message: Message, user_id: int, url: str) -> None:
 async def url_action_callback_handler(callback: CallbackQuery) -> None:
     parsed = parse_url_callback_data(callback.data)
     if parsed is None:
-        await callback.answer("Invalid action", show_alert=True)
+        await callback.answer(
+            text("invalid_action", get_language(callback.from_user.id)), show_alert=True
+        )
         return
     user_id = callback.from_user.id
     language = get_language(user_id)
@@ -481,14 +484,19 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
         if download_quota.remaining(
             user_id, settings.max_downloads_per_user_per_day
         ) <= 0:
-            await message.answer("Daily download quota exceeded. Try again tomorrow.")
+            await message.answer(text("daily_quota_exceeded", language))
             return
     try:
         job = create_background_job_for_user(user_id, command, session.url)
         if command == "download":
             download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
         await message.answer(
-            text("job_started", language, job_id=job.id, status=job.status)
+            text(
+                "job_started",
+                language,
+                job_id=job.id,
+                status=job_status_text(job.status, language),
+            )
         )
         runner = {
             "html": run_html_job,
@@ -506,26 +514,36 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
 @router.message(Command("whoami"))
 async def whoami_handler(message: Message) -> None:
     user_id = get_user_id(message)
-    await message.answer(f"Your Telegram ID: {user_id}" if user_id else "User ID unavailable")
+    language = get_language(user_id)
+    await message.answer(
+        text("whoami", language, user_id=user_id)
+        if user_id is not None
+        else text("user_id_unavailable", language)
+    )
 
 
 @router.message(Command("access"))
 async def access_handler(message: Message) -> None:
     user_id = get_user_id(message)
     if user_id is None or not is_admin(user_id):
-        await message.answer(ADMIN_REQUIRED)
+        await message.answer(text("admin_required", get_language(user_id)))
         return
+    language = get_language(user_id)
     settings = get_settings()
     static_allowed = parse_telegram_ids(settings.allowed_telegram_ids)
     runtime_allowed = list_allowed_users(Path(settings.access_storage_path))
-    await message.answer(
-        f"Your Telegram ID: {user_id}\n"
-        f"Admin: yes\n"
-        f"Runtime access management: "
-        f"{'enabled' if settings.enable_runtime_access_management else 'disabled'}\n"
-        f"Static allowed users: {len(static_allowed)}\n"
-        f"Runtime allowed users: {len(runtime_allowed)}"
-    )
+    await message.answer(text(
+        "access_status",
+        language,
+        user_id=user_id,
+        admin=text("yes", language),
+        runtime_state=text(
+            "enabled" if settings.enable_runtime_access_management else "disabled",
+            language,
+        ),
+        static_count=len(static_allowed),
+        runtime_count=len(runtime_allowed),
+    ))
 
 
 def parse_access_target(arguments: str | None) -> tuple[int, str | None]:
@@ -546,11 +564,12 @@ def runtime_access_path() -> Path:
 
 async def require_runtime_admin(message: Message) -> int | None:
     user_id = get_user_id(message)
+    language = get_language(user_id)
     if user_id is None or not is_admin(user_id):
-        await message.answer(ADMIN_REQUIRED)
+        await message.answer(text("admin_required", language))
         return None
     if not get_settings().enable_runtime_access_management:
-        await message.answer("Runtime access management is disabled.")
+        await message.answer(text("runtime_access_disabled", language))
         return None
     return user_id
 
@@ -571,14 +590,15 @@ async def allow_handler(message: Message, command: CommandObject) -> None:
     try:
         telegram_id, note = parse_access_target(command.args)
     except ValueError as exc:
-        await message.answer(f"Error: {exc}")
+        key = "access_target_invalid" if "integer" in str(exc) else "access_target_required"
+        await message.answer(text(key, get_language(admin_id)))
         return
     added = add_allowed_user(runtime_access_path(), telegram_id, admin_id, note)
-    await message.answer(
-        f"Access granted to {telegram_id}."
-        if added
-        else f"User {telegram_id} is already runtime-allowed."
-    )
+    await message.answer(text(
+        "access_granted" if added else "access_already_allowed",
+        get_language(admin_id),
+        user_id=telegram_id,
+    ))
 
 
 @router.message(Command("deny"))
@@ -589,36 +609,42 @@ async def deny_handler(message: Message, command: CommandObject) -> None:
     try:
         telegram_id, _ = parse_access_target(command.args)
     except ValueError as exc:
-        await message.answer(f"Error: {exc}")
+        key = "access_target_invalid" if "integer" in str(exc) else "access_target_required"
+        await message.answer(text(key, get_language(admin_id)))
         return
     try:
         removed = deny_runtime_user(runtime_access_path(), telegram_id)
-    except ValueError as exc:
-        await message.answer(f"{exc}.")
+    except ValueError:
+        await message.answer(text("admin_cannot_be_denied", get_language(admin_id)))
         return
-    await message.answer(
-        f"Runtime access revoked for {telegram_id}."
-        if removed
-        else "Runtime allowed user not found."
-    )
+    await message.answer(text(
+        "access_revoked" if removed else "access_user_not_found",
+        get_language(admin_id),
+        user_id=telegram_id,
+    ))
 
 
 @router.message(Command("allowed_users"))
 async def allowed_users_handler(message: Message) -> None:
-    if await require_runtime_admin(message) is None:
+    admin_id = await require_runtime_admin(message)
+    if admin_id is None:
         return
+    language = get_language(admin_id)
     settings = get_settings()
     static_ids = sorted(parse_telegram_ids(settings.allowed_telegram_ids))
     runtime_users = list_allowed_users(runtime_access_path())
-    static_text = ", ".join(map(str, static_ids)) if static_ids else "none"
+    static_text = ", ".join(map(str, static_ids)) if static_ids else text("none", language)
     runtime_text = "\n".join(
         f"{user.telegram_id}"
         + (f" - {user.note}" if user.note else "")
         for user in runtime_users
-    ) or "none"
-    await message.answer(
-        f"Static allowed users: {static_text}\nRuntime allowed users:\n{runtime_text}"
-    )
+    ) or text("none", language)
+    await message.answer(text(
+        "allowed_users_list",
+        language,
+        static_users=static_text,
+        runtime_users=runtime_text,
+    ))
 
 
 def parse_set_text_args(arguments: str | None) -> tuple[str, str, str]:
@@ -756,98 +782,99 @@ async def preview_text_handler(message: Message, command: CommandObject) -> None
 async def admin_status_handler(message: Message) -> None:
     user_id = get_user_id(message)
     if user_id is None or not is_admin(user_id):
-        await message.answer(ADMIN_REQUIRED)
+        await message.answer(text("admin_required", get_language(user_id)))
         return
+    language = get_language(user_id)
     status = build_admin_status(get_settings(), job_store)
     directories = ", ".join(
-        f"{name}={'ready' if exists else 'missing'}"
+        f"{name}={text('ready' if exists else 'missing', language)}"
         for name, exists in status.generated_directories.items()
     )
-    await message.answer(
-        f"Version: {status.version}\n"
-        f"Runtime target: {status.runtime_target}\n"
-        f"Active jobs: {status.active_jobs}\n"
-        f"Known jobs: {status.known_jobs}\n"
-        f"Runtime allowed users: {status.runtime_allowed_users}\n"
-        f"Storage free: {status.storage_free_bytes} bytes\n"
-        f"Cookie import: {'enabled' if status.cookie_import_enabled else 'disabled'}\n"
-        f"Generated directories: {directories}"
-    )
+    await message.answer(text(
+        "admin_status",
+        language,
+        version=status.version,
+        runtime_target=status.runtime_target,
+        active_jobs=status.active_jobs,
+        known_jobs=status.known_jobs,
+        runtime_users=status.runtime_allowed_users,
+        free_bytes=status.storage_free_bytes,
+        cookie_state=text("enabled" if status.cookie_import_enabled else "disabled", language),
+        directories=directories,
+    ))
 
 
 @router.message(Command("cleanup"))
 async def cleanup_handler(message: Message) -> None:
     user_id = get_user_id(message)
     if user_id is None or not is_admin(user_id):
-        await message.answer(ADMIN_REQUIRED)
+        await message.answer(text("admin_required", get_language(user_id)))
         return
+    language = get_language(user_id)
     settings = get_settings()
     try:
         result = cleanup_generated_files(
             Path(settings.downloads_dir), settings.cleanup_max_age_hours
         )
     except OSError:
-        await message.answer("Cleanup failed because generated files could not be removed.")
+        await message.answer(text("cleanup_failed", language))
         return
-    await message.answer(
-        f"Cleanup complete.\nDeleted files: {result.deleted_files}\n"
-        f"Freed bytes: {result.freed_bytes}"
-    )
+    await message.answer(text(
+        "cleanup_summary",
+        language,
+        count=result.deleted_files,
+        bytes=result.freed_bytes,
+    ))
 
 
 @router.message(Command("purge_history"))
 async def purge_history_handler(message: Message) -> None:
     user_id = get_user_id(message)
     if user_id is None or not is_admin(user_id):
-        await message.answer(ADMIN_REQUIRED)
+        await message.answer(text("admin_required", get_language(user_id)))
         return
+    language = get_language(user_id)
     try:
         purged = purge_job_history(Path(get_settings().job_history_path))
     except OSError:
-        await message.answer("Job history could not be cleared.")
+        await message.answer(text("purge_history_failed", language))
         return
-    await message.answer(f"Job history cleared. Removed entries: {purged}")
+    await message.answer(text("purge_history_summary", language, count=purged))
 
 
 @router.message(Command("cookies_help"))
 async def cookies_help_handler(message: Message) -> None:
     if await reject_unless_allowed(message):
         return
-    await message.answer(
-        "Use /cookies_import <domain>, then send a Playwright-compatible JSON list. "
-        "Each cookie requires name, value, and domain. Cookie values are never echoed."
-    )
+    await message.answer(text("cookies_help", get_language(get_user_id(message))))
 
 
 @router.message(Command("cookies_import"))
 async def cookies_import_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
+    language = get_language(get_user_id(message))
     settings = get_settings()
     if not settings.enable_cookie_import:
-        await message.answer("Cookie import is disabled.")
+        await message.answer(text("cookie_import_disabled", language))
         return
     if not settings.cookie_encryption_key:
-        await message.answer(
-            "Cookie encryption key is not configured. Ask the bot owner to configure it."
-        )
+        await message.answer(text("cookie_key_missing", language))
         return
     if not command.args:
-        await message.answer("Usage: /cookies_import <domain>")
+        await message.answer(text("cookies_import_usage", language))
         return
     try:
         domain = normalize_domain(command.args.strip())
     except CookieValidationError as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(text("request_failed", language, error=str(exc)))
         return
     user_id = get_user_id(message)
     if user_id is None:
-        await message.answer("Unable to identify the requesting user.")
+        await message.answer(text("user_identification_failed", language))
         return
     pending_cookie_imports[user_id] = domain
-    await message.answer(
-        f"Send the JSON cookie list for {domain} in your next message."
-    )
+    await message.answer(text("cookies_send_json", language, domain=domain))
 
 
 @router.message(Command("sessions"))
@@ -855,11 +882,12 @@ async def sessions_handler(message: Message) -> None:
     if await reject_unless_allowed(message):
         return
     user_id = get_user_id(message)
+    language = get_language(user_id)
     sessions = list_sessions(user_id) if user_id is not None else []
     await message.answer(
-        "Saved sessions:\n" + "\n".join(sessions)
+        text("sessions_list", language, sessions="\n".join(sessions))
         if sessions
-        else "No saved sessions."
+        else text("sessions", language)
     )
 
 
@@ -867,71 +895,81 @@ async def sessions_handler(message: Message) -> None:
 async def delete_session_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /delete_session <domain>")
-        return
     user_id = get_user_id(message)
+    language = get_language(user_id)
+    if not command.args:
+        await message.answer(text("delete_session_usage", language))
+        return
     try:
         domain = normalize_domain(command.args.strip())
         deleted = user_id is not None and delete_session(user_id, domain)
     except CookieValidationError as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(text("request_failed", language, error=str(exc)))
         return
-    await message.answer(
-        f"Session deleted for {domain}" if deleted else "Session not found."
-    )
+    await message.answer(text(
+        "session_deleted" if deleted else "session_not_found",
+        language,
+        domain=domain,
+    ))
 
 
 @router.message(Command("fetch"))
 async def fetch_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
+    language = get_language(get_user_id(message))
     try:
         url = parse_single_url_arg(command.args)
         async with HttpFetcher() as fetcher:
             response = await fetcher.fetch(url)
         body = safe_response_text(response)[:3500]
-        await message.answer(f"Status: {response.status_code}\n\n{body}")
+        await message.answer(
+            f"{text('http_status', language, status=response.status_code)}\n\n{body}"
+        )
     except CommandArgumentError:
-        await message.answer(url_usage("fetch"))
+        await message.answer(text("url_usage", language, command="fetch"))
     except (URLValidationError, FetchError) as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(text("request_failed", language, error=str(exc)))
 
 
 @router.message(Command("links"))
 async def links_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
+    language = get_language(get_user_id(message))
     try:
         url = parse_single_url_arg(command.args)
         async with HttpFetcher() as fetcher:
             response = await fetcher.fetch(url)
         links = LinkExtractor.extract(safe_response_text(response), str(response.url))
         if not links:
-            await message.answer("No links found.")
+            await message.answer(text("no_links", language))
             return
-        text = "\n".join(links[:50])
-        await message.answer(text[:4000])
+        output = "\n".join(links[:50])
+        await message.answer(output[:4000])
     except CommandArgumentError:
-        await message.answer(url_usage("links"))
+        await message.answer(text("url_usage", language, command="links"))
     except (URLValidationError, FetchError) as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(text("request_failed", language, error=str(exc)))
 
 
 @router.message(Command("html"))
 async def html_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
+    language = get_language(get_user_id(message))
     try:
         url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "html", url)
-        await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
+        await message.answer(text(
+            "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
+        ))
         task = asyncio.create_task(run_html_job(job, message))
         job_store.register_task(job.id, task)
     except CommandArgumentError:
-        await message.answer(url_usage("html"))
+        await message.answer(text("url_usage", language, command="html"))
     except (URLValidationError, JobLimitError) as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(text("request_failed", language, error=str(exc)))
 
 
 def create_background_job(message: Message, command: str, url: str) -> Job:
@@ -961,6 +999,7 @@ def browser_cookies_for_job(job: Job) -> tuple[dict, ...]:
 
 async def run_html_job(job: Job, message: Message) -> None:
     settings = get_settings()
+    language = get_language(job.user_id)
     job_store.update_job(job.id, status="running", progress=10)
     try:
         async with HttpFetcher(max_response_bytes=0) as fetcher:
@@ -979,7 +1018,7 @@ async def run_html_job(job: Job, message: Message) -> None:
             Path(settings.downloads_dir),
             settings.delete_generated_files_after_send,
         )
-        result_message = f"HTML saved and sent: {output_path.name}"
+        result_message = text("html_sent", language, filename=output_path.name)
         job_store.update_job(
             job.id, status="success", progress=100, result_message=result_message
         )
@@ -990,27 +1029,31 @@ async def run_html_job(job: Job, message: Message) -> None:
     except (URLValidationError, FetchError, StorageError, OSError, TelegramAPIError) as exc:
         await fail_job(job.id, message, str(exc))
     except Exception:
-        await fail_job(job.id, message, "Job failed unexpectedly")
+        await fail_job(job.id, message, text("job_unexpected_failure", language))
 
 
 @router.message(Command("html_rendered", "rendered_html"))
 async def rendered_html_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
+    language = get_language(get_user_id(message))
     try:
         url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "html_rendered", url)
-        await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
+        await message.answer(text(
+            "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
+        ))
         task = asyncio.create_task(run_rendered_html_job(job, message))
         job_store.register_task(job.id, task)
     except CommandArgumentError:
-        await message.answer(url_usage("html_rendered"))
+        await message.answer(text("url_usage", language, command="html_rendered"))
     except (URLValidationError, JobLimitError) as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(text("request_failed", language, error=str(exc)))
 
 
 async def run_rendered_html_job(job: Job, message: Message) -> None:
     settings = get_settings()
+    language = get_language(job.user_id)
     job_store.update_job(job.id, status="running", progress=10)
     try:
         options = RenderedHtmlOptions(
@@ -1029,10 +1072,11 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
         await message.answer_document(
             FSInputFile(result.path),
             caption=(
-                f"Filename: {result.filename}\n"
-                f"Size: {result.size_bytes} bytes\n"
-                f"Final URL: {result.final_url}\n"
-                f"Compressed: {'yes' if result.compressed else 'no'}"
+                f"{text('filename_label', language)}: {result.filename}\n"
+                f"{text('size_label', language)}: {result.size_bytes} bytes\n"
+                f"{text('final_url_label', language)}: {result.final_url}\n"
+                f"{text('compressed_label', language)}: "
+                f"{text('yes' if result.compressed else 'no', language)}"
             ),
         )
         cleanup_sent_file(
@@ -1044,14 +1088,14 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
             job.id,
             status="success",
             progress=100,
-            result_message=f"Rendered HTML exported and sent: {result.filename}",
+            result_message=text("rendered_html_sent", language, filename=result.filename),
         )
     except asyncio.CancelledError:
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
     except NotImplementedError as exc:
-        safe_message = map_browser_runtime_error(exc) or "Browser request failed"
+        safe_message = map_browser_runtime_error(exc) or text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except (
@@ -1066,23 +1110,23 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
         log_safe_job_error(job, exc, str(exc))
         await fail_job(job.id, message, str(exc))
     except TelegramAPIError as exc:
-        safe_message = "Telegram could not send the rendered HTML file"
+        safe_message = text("telegram_rendered_html_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except Exception as exc:
-        safe_message = "Browser request failed"
+        safe_message = text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
 
 
 def format_download_info(
-    filename: str, content_type: str, size: int, sha256: str
+    filename: str, content_type: str, size: int, sha256: str, language: str = "en"
 ) -> str:
     return (
-        f"Filename: {filename}\n"
-        f"Content type: {content_type}\n"
-        f"Size: {size} bytes\n"
-        f"SHA256: {sha256}"
+        f"{text('filename_label', language)}: {filename}\n"
+        f"{text('content_type_label', language)}: {content_type}\n"
+        f"{text('size_label', language)}: {size} bytes\n"
+        f"{text('sha256_label', language)}: {sha256}"
     )
 
 
@@ -1091,28 +1135,32 @@ async def download_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
     user_id = get_user_id(message)
+    language = get_language(user_id)
     settings = get_settings()
     if user_id is None or download_quota.remaining(
         user_id, settings.max_downloads_per_user_per_day
     ) <= 0:
-        await message.answer("Daily download quota exceeded. Try again tomorrow.")
+        await message.answer(text("daily_quota_exceeded", language))
         return
 
     try:
         url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "download", url)
         download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
-        await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
+        await message.answer(text(
+            "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
+        ))
         task = asyncio.create_task(run_download_job(job, message))
         job_store.register_task(job.id, task)
     except CommandArgumentError:
-        await message.answer(url_usage("download"))
+        await message.answer(text("url_usage", language, command="download"))
     except (URLValidationError, JobLimitError) as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(text("request_failed", language, error=str(exc)))
 
 
 async def run_download_job(job: Job, message: Message) -> None:
     settings = get_settings()
+    language = get_language(job.user_id)
     job_store.update_job(job.id, status="running", progress=10)
     try:
         async with FileDownloader() as downloader:
@@ -1124,14 +1172,14 @@ async def run_download_job(job: Job, message: Message) -> None:
             )
         job_store.update_job(job.id, progress=80)
         info = format_download_info(
-            result.filename, result.content_type, result.size, result.sha256
+            result.filename, result.content_type, result.size, result.sha256, language
         )
         upload_limit = settings.telegram_max_upload_size_mb * 1024 * 1024
         if result.size > upload_limit:
             await message.answer(
-                f"{info}\n\nFile saved locally but exceeds the Telegram upload limit."
+                f"{info}\n\n{text('upload_limit_exceeded', language)}"
             )
-            result_message = "File saved locally; Telegram upload limit exceeded."
+            result_message = text("upload_limit_result", language)
         else:
             await message.answer_document(FSInputFile(result.path), caption=info)
             cleanup_sent_file(
@@ -1139,7 +1187,7 @@ async def run_download_job(job: Job, message: Message) -> None:
                 Path(settings.downloads_dir),
                 settings.delete_generated_files_after_send,
             )
-            result_message = f"File downloaded and sent: {result.filename}"
+            result_message = text("download_sent", language, filename=result.filename)
         job_store.update_job(
             job.id, status="success", progress=100, result_message=result_message
         )
@@ -1148,33 +1196,37 @@ async def run_download_job(job: Job, message: Message) -> None:
             job_store.update_job(job.id, status="cancelled")
         raise
     except TelegramAPIError as exc:
-        safe_message = "Telegram could not accept the upload. The file remains saved locally."
+        safe_message = text("telegram_upload_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except (URLValidationError, DownloadError, StorageError, OSError) as exc:
         await fail_job(job.id, message, str(exc))
     except Exception:
-        await fail_job(job.id, message, "Job failed unexpectedly")
+        await fail_job(job.id, message, text("job_unexpected_failure", language))
 
 
 @router.message(Command("screenshot"))
 async def screenshot_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
+    language = get_language(get_user_id(message))
     try:
         url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "screenshot", url)
-        await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
+        await message.answer(text(
+            "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
+        ))
         task = asyncio.create_task(run_screenshot_job(job, message))
         job_store.register_task(job.id, task)
     except CommandArgumentError:
-        await message.answer(url_usage("screenshot"))
+        await message.answer(text("url_usage", language, command="screenshot"))
     except (URLValidationError, JobLimitError) as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(text("request_failed", language, error=str(exc)))
 
 
 async def run_screenshot_job(job: Job, message: Message) -> None:
     settings = get_settings()
+    language = get_language(job.user_id)
     job_store.update_job(job.id, status="running", progress=10)
     try:
         options = ScreenshotOptions(
@@ -1192,9 +1244,9 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
         await message.answer_document(
             FSInputFile(result.path),
             caption=(
-                f"Filename: {result.filename}\n"
-                f"Size: {result.size_bytes} bytes\n"
-                f"Final URL: {result.final_url}"
+                f"{text('filename_label', language)}: {result.filename}\n"
+                f"{text('size_label', language)}: {result.size_bytes} bytes\n"
+                f"{text('final_url_label', language)}: {result.final_url}"
             ),
         )
         cleanup_sent_file(
@@ -1206,14 +1258,14 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
             job.id,
             status="success",
             progress=100,
-            result_message=f"Screenshot captured and sent: {result.filename}",
+            result_message=text("screenshot_sent", language, filename=result.filename),
         )
     except asyncio.CancelledError:
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
     except NotImplementedError as exc:
-        safe_message = map_browser_runtime_error(exc) or "Browser request failed"
+        safe_message = map_browser_runtime_error(exc) or text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except (
@@ -1229,11 +1281,11 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
         log_safe_job_error(job, exc, str(exc))
         await fail_job(job.id, message, str(exc))
     except TelegramAPIError as exc:
-        safe_message = "Telegram could not send the screenshot file"
+        safe_message = text("telegram_screenshot_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except Exception as exc:
-        safe_message = "Browser request failed"
+        safe_message = text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
 
@@ -1242,20 +1294,24 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
 async def pdf_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
+    language = get_language(get_user_id(message))
     try:
         url = validate_url(parse_single_url_arg(command.args))
         job = create_background_job(message, "pdf", url)
-        await message.answer(f"Job ID: {job.id}\nStatus: {job.status}")
+        await message.answer(text(
+            "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
+        ))
         task = asyncio.create_task(run_pdf_job(job, message))
         job_store.register_task(job.id, task)
     except CommandArgumentError:
-        await message.answer(url_usage("pdf"))
+        await message.answer(text("url_usage", language, command="pdf"))
     except (URLValidationError, JobLimitError) as exc:
-        await message.answer(f"Error: {exc}")
+        await message.answer(text("request_failed", language, error=str(exc)))
 
 
 async def run_pdf_job(job: Job, message: Message) -> None:
     settings = get_settings()
+    language = get_language(job.user_id)
     job_store.update_job(job.id, status="running", progress=10)
     try:
         options = PdfOptions(
@@ -1271,9 +1327,9 @@ async def run_pdf_job(job: Job, message: Message) -> None:
         await message.answer_document(
             FSInputFile(result.path),
             caption=(
-                f"Filename: {result.filename}\n"
-                f"Size: {result.size_bytes} bytes\n"
-                f"Final URL: {result.final_url}"
+                f"{text('filename_label', language)}: {result.filename}\n"
+                f"{text('size_label', language)}: {result.size_bytes} bytes\n"
+                f"{text('final_url_label', language)}: {result.final_url}"
             ),
         )
         cleanup_sent_file(
@@ -1285,14 +1341,14 @@ async def run_pdf_job(job: Job, message: Message) -> None:
             job.id,
             status="success",
             progress=100,
-            result_message=f"PDF exported and sent: {result.filename}",
+            result_message=text("pdf_sent", language, filename=result.filename),
         )
     except asyncio.CancelledError:
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
     except NotImplementedError as exc:
-        safe_message = map_browser_runtime_error(exc) or "Browser request failed"
+        safe_message = map_browser_runtime_error(exc) or text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except (
@@ -1308,18 +1364,20 @@ async def run_pdf_job(job: Job, message: Message) -> None:
         log_safe_job_error(job, exc, str(exc))
         await fail_job(job.id, message, str(exc))
     except TelegramAPIError as exc:
-        safe_message = "Telegram could not send the PDF file"
+        safe_message = text("telegram_pdf_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
     except Exception as exc:
-        safe_message = "Browser request failed"
+        safe_message = text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
 
 
 async def fail_job(job_id: str, message: Message, error: str) -> None:
     job_store.update_job(job_id, status="failed", error_message=error)
-    await message.answer(f"Job {job_id} failed: {error}")
+    await message.answer(text(
+        "job_failed", get_language(get_user_id(message)), job_id=job_id, error=error
+    ))
 
 
 def log_safe_job_error(job: Job, error: BaseException, safe_message: str) -> None:
@@ -1332,30 +1390,34 @@ def log_safe_job_error(job: Job, error: BaseException, safe_message: str) -> Non
     )
 
 
-def format_job(job: Job) -> str:
+def job_status_text(status: str, language: str) -> str:
+    return text(f"job_status_{status}", language)
+
+
+def format_job(job: Job, language: str = "en") -> str:
     details = [
-        f"Job ID: {job.id}",
-        f"Command: /{job.command}",
-        f"Status: {job.status}",
-        f"Progress: {job.progress}%",
+        f"{text('job_id_label', language)}: {job.id}",
+        f"{text('command_label', language)}: /{job.command}",
+        f"{text('status_label', language)}: {job_status_text(job.status, language)}",
+        f"{text('progress_label', language)}: {job.progress}%",
     ]
     if job.result_message:
-        details.append(f"Result: {job.result_message}")
+        details.append(f"{text('result_label', language)}: {job.result_message}")
     if job.error_message:
-        details.append(f"Error: {job.error_message}")
+        details.append(f"{text('error_label', language)}: {job.error_message}")
     return "\n".join(details)
 
 
-def format_job_history(job: JobHistoryEntry) -> str:
+def format_job_history(job: JobHistoryEntry, language: str = "en") -> str:
     details = [
-        f"Job ID: {job.job_id}",
-        f"Command: /{job.command}",
-        f"Status: {job.status}",
+        f"{text('job_id_label', language)}: {job.job_id}",
+        f"{text('command_label', language)}: /{job.command}",
+        f"{text('status_label', language)}: {job_status_text(job.status, language)}",
     ]
     if job.url_domain:
-        details.append(f"Domain: {job.url_domain}")
+        details.append(f"{text('domain_label', language)}: {job.url_domain}")
     if job.error_message:
-        details.append(f"Error: {job.error_message}")
+        details.append(f"{text('error_label', language)}: {job.error_message}")
     return "\n".join(details)
 
 
@@ -1398,12 +1460,13 @@ def list_job_records(
 async def status_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /status <job_id>")
-        return
     user_id = get_user_id(message)
+    language = get_language(user_id)
+    if not command.args:
+        await message.answer(text("status_usage", language))
+        return
     if user_id is None:
-        await message.answer("Job not found.")
+        await message.answer(text("job_not_found", language))
         return
     job = get_job_status_record(
         command.args.strip(),
@@ -1413,10 +1476,12 @@ async def status_handler(message: Message, command: CommandObject) -> None:
         Path(get_settings().job_history_path),
     )
     if job is None:
-        await message.answer("Job not found.")
+        await message.answer(text("job_not_found", language))
         return
     await message.answer(
-        format_job(job) if isinstance(job, Job) else format_job_history(job)
+        format_job(job, language)
+        if isinstance(job, Job)
+        else format_job_history(job, language)
     )
 
 
@@ -1425,8 +1490,9 @@ async def jobs_handler(message: Message) -> None:
     if await reject_unless_allowed(message):
         return
     user_id = get_user_id(message)
+    language = get_language(user_id)
     if user_id is None:
-        await message.answer("No jobs found.")
+        await message.answer(text("no_jobs", language))
         return
     jobs = list_job_records(
         user_id,
@@ -1435,11 +1501,13 @@ async def jobs_handler(message: Message) -> None:
         Path(get_settings().job_history_path),
     )
     if not jobs:
-        await message.answer("No jobs found.")
+        await message.answer(text("no_jobs", language))
         return
     await message.answer(
         "\n\n".join(
-            format_job(job) if isinstance(job, Job) else format_job_history(job)
+            format_job(job, language)
+            if isinstance(job, Job)
+            else format_job_history(job, language)
             for job in jobs[:10]
         )
     )
@@ -1449,16 +1517,19 @@ async def jobs_handler(message: Message) -> None:
 async def cancel_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
-    if not command.args:
-        await message.answer("Usage: /cancel <job_id>")
-        return
     user_id = get_user_id(message)
+    language = get_language(user_id)
+    if not command.args:
+        await message.answer(text("cancel_usage", language))
+        return
     if user_id is None or not job_store.cancel_job(
         command.args.strip(), user_id, is_admin(user_id)
     ):
-        await message.answer("Job not found, not active, or not owned by you.")
+        await message.answer(text("job_cancel_failed", language))
         return
-    await message.answer(f"Job {command.args.strip()} cancelled.")
+    await message.answer(
+        text("job_cancelled", language, job_id=command.args.strip())
+    )
 
 
 @router.message()
@@ -1476,13 +1547,11 @@ async def text_message_handler(message: Message) -> None:
         domain = pending_cookie_imports[user_id]
         if not settings.enable_cookie_import:
             pending_cookie_imports.pop(user_id, None)
-            await message.answer("Cookie import is disabled.")
+            await message.answer(text("cookie_import_disabled", get_language(user_id)))
             return
         if not settings.cookie_encryption_key:
             pending_cookie_imports.pop(user_id, None)
-            await message.answer(
-                "Cookie encryption key is not configured. Ask the bot owner to configure it."
-            )
+            await message.answer(text("cookie_key_missing", get_language(user_id)))
             return
         try:
             cookies = validate_cookies_json(
@@ -1490,11 +1559,13 @@ async def text_message_handler(message: Message) -> None:
             )
             save_cookies(user_id, domain, json.dumps(cookies, separators=(",", ":")))
         except (CookieValidationError, EncryptionError, OSError) as exc:
-            await message.answer(f"Error: {exc}")
+            await message.answer(
+                text("request_failed", get_language(user_id), error=str(exc))
+            )
             return
 
         pending_cookie_imports.pop(user_id, None)
-        await message.answer(f"Cookies saved for {domain}")
+        await message.answer(text("cookies_saved", get_language(user_id), domain=domain))
         return
 
     stripped = message.text.strip()

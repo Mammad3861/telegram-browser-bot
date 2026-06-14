@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.5.1-alpha.1] - 2026-06-15
+
+### Fixed
+
+- Completed Persian translations across menus, URL/search cards, inline buttons, jobs, access management, admin text commands, cleanup/history responses, cookie sessions, and common errors.
+- Preserved Persian button labels when URL and search cards are refreshed through callbacks.
+- Localized job status labels and generated-file captions using each user's persisted preference.
+- Added strict English/Persian translation-key parity and Persian UI rendering tests.
+
+### Documentation
+
+- Documented broad Persian UI coverage and Telegram client command-menu caching behavior.
+
 ## [v1.5.0-alpha.1] - 2026-06-14
 
 ### Added

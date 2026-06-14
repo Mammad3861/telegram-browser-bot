@@ -2,6 +2,8 @@
 
 Telegram's native Menu button contains the common commands. Advanced commands remain available by typing them directly.
 
+English and Persian preferences cover menus, URL/search cards, buttons, jobs, admin text tools, and common bot messages. Telegram clients may cache native command descriptions briefly after the bot registers updated `language_code="fa"` commands; reopening the chat or restarting the client usually refreshes them.
+
 ## Public Commands
 
 | Command | Description |

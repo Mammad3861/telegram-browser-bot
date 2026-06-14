@@ -1,5 +1,7 @@
 import pytest
 
+from app.bot.i18n import text
+
 from app.search.ui import (
     format_search_results,
     parse_search_callback_data,
@@ -56,3 +58,11 @@ def test_search_result_card_includes_provider_and_partial_count() -> None:
 
     assert "Source: Brave" in card
     assert "Showing 1 of up to 5 requested results." in card
+
+
+def test_persian_search_control_labels() -> None:
+    keyboard = search_results_keyboard("abc12345", 1, "fa")
+    controls = keyboard.inline_keyboard[-1]
+
+    assert controls[0].text == text("search_again_button", "fa")
+    assert controls[1].text == text("close_button", "fa")
