@@ -92,11 +92,34 @@ Active jobs remain in memory. Only safe completed-job summaries are persisted, u
 | `CONTENT_POLICY_PATH` | `downloads/policies/content_policy.json` | Atomic local domain/category policy store. |
 | `ENABLE_CONTENT_POLICY` | `true` | Enforces policy before cards, fetches, downloads, and browser jobs. |
 | `CONTENT_POLICY_DEFAULT_ACTION` | `allow` | Action for domains without a matching rule: `allow` or `block`. |
-| `ENABLE_BUILTIN_SAFETY_BLOCKLIST` | `true` | Enables the small built-in adult/gambling seed lists. |
-| `BUILTIN_BLOCK_ADULT` | `true` | Enables built-in adult-domain seeds. |
-| `BUILTIN_BLOCK_GAMBLING` | `true` | Enables built-in gambling-domain seeds. |
+| `ENABLE_BUILTIN_SAFETY_BLOCKLIST` | `true` | Enables built-in domain-to-category classification lists. |
+| `BUILTIN_ADULT_CATEGORY_ENABLED` | `true` | Classifies known adult domains. |
+| `BUILTIN_GAMBLING_CATEGORY_ENABLED` | `true` | Classifies known gambling domains. |
+| `BUILTIN_CRYPTO_CATEGORY_ENABLED` | `true` | Classifies known crypto domains. |
+| `BUILTIN_MEDIA_CATEGORY_ENABLED` | `true` | Classifies known media domains. |
 
-The policy supports explicit blocked/allowed domains, blocked keywords, and lightweight domain lists for media, gambling, adult, and dangerous categories. Explicit allow rules override category rules, but never override URL validation or private/internal destination protection. No external classification service is called.
+The built-in lists classify domains; classification does not automatically block them. New policies block `malware`, `phishing`, and `dangerous` by default. Administrators can independently allow, block, or leave neutral every category.
+
+Rule precedence is: URL/SSRF validation, explicit blocked domain, explicit allowed domain, explicitly allowed category, blocked category, then default action. Blocked search keywords take priority over allowed keywords. Existing older JSON files retain their configured blocked categories during migration. Classification is lightweight and is not claimed to be complete.
+
+The local policy file uses this shape:
+
+```json
+{
+  "enabled": true,
+  "default_action": "allow",
+  "blocked_categories": ["malware", "phishing", "dangerous"],
+  "allowed_categories": [],
+  "blocked_domains": [],
+  "allowed_domains": [],
+  "category_domains": {
+    "adult": [], "gambling": [], "crypto": [], "malware": [],
+    "phishing": [], "dangerous": [], "media": [], "custom": []
+  },
+  "blocked_keywords": [],
+  "allowed_keywords": []
+}
+```
 
 ## Outbound Routing
 

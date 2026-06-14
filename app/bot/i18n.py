@@ -199,7 +199,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "Content policy: {state}\nDefault action: {default_action}\n"
             "Built-in safety filter: {builtin_state}\n"
             "Blocked domains: {blocked}\nAllowed domains: {allowed}\n"
-            "Blocked categories: {categories}\nUpdated: {updated_at}"
+            "Blocked categories: {categories}\nAllowed categories: {allowed_categories}\n"
+            "Configurable categories: {configurable_categories}\nUpdated: {updated_at}"
         ),
         "policy_domain_added": "Policy rule added for {domain}.",
         "policy_domain_exists": "Policy rule already exists for {domain}.",
@@ -211,11 +212,27 @@ TEXTS: dict[str, dict[str, str]] = {
         "policy_invalid_category": "Invalid category. Use: {categories}.",
         "policy_category_adult": "adult",
         "policy_category_gambling": "gambling",
+        "policy_category_crypto": "crypto",
         "policy_category_malware": "malware",
         "policy_category_phishing": "phishing",
         "policy_category_dangerous": "dangerous",
         "policy_category_media": "media",
         "policy_category_custom": "custom",
+        "policy_state_blocked": "blocked",
+        "policy_state_allowed": "allowed",
+        "policy_state_neutral": "neutral",
+        "policy_categories_title": "Category policy:\n{categories}",
+        "policy_category_line": "{category}: {state}",
+        "policy_category_rule_updated": "{category} is now {state}.",
+        "policy_category_rule_unchanged": "{category} was already {state}.",
+        "policy_category_usage": "Usage: /{command} <category>",
+        "policy_category_domain_usage": "Usage: /{command} <category> <domain>",
+        "policy_category_domains": "Domains classified as {category}:\n{domains}",
+        "policy_invalid_category_or_domain": "Invalid category or domain. Categories: {categories}.",
+        "policy_category_domain_added": "Added {domain} to {category}.",
+        "policy_category_domain_exists": "{domain} is already in {category}.",
+        "policy_category_domain_removed": "Removed {domain} from {category}.",
+        "policy_category_domain_missing": "{domain} was not found in {category}.",
         "policy_usage_domain": "Usage: /{command} <domain>",
         "policy_usage_test": "Usage: /policy_test <url>",
         "allowed": "allowed",
@@ -427,7 +444,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "سیاست محتوا: {state}\nعمل پیش‌فرض: {default_action}\n"
             "فیلتر ایمنی داخلی: {builtin_state}\n"
             "دامنه‌های مسدود: {blocked}\nدامنه‌های مجاز: {allowed}\n"
-            "دسته‌های مسدود: {categories}\nآخرین تغییر: {updated_at}"
+            "دسته‌های مسدود: {categories}\nدسته‌های مجاز: {allowed_categories}\n"
+            "دسته‌های قابل تنظیم: {configurable_categories}\nآخرین تغییر: {updated_at}"
         ),
         "policy_domain_added": "قانون سیاست برای {domain} افزوده شد.",
         "policy_domain_exists": "قانون سیاست برای {domain} از قبل وجود دارد.",
@@ -439,11 +457,27 @@ TEXTS: dict[str, dict[str, str]] = {
         "policy_invalid_category": "دسته نامعتبر است. یکی از این موارد را انتخاب کنید: {categories}.",
         "policy_category_adult": "بزرگسالان",
         "policy_category_gambling": "قمار",
+        "policy_category_crypto": "کریپتو",
         "policy_category_malware": "بدافزار",
         "policy_category_phishing": "فیشینگ",
         "policy_category_dangerous": "خطرناک",
         "policy_category_media": "رسانه",
         "policy_category_custom": "سفارشی",
+        "policy_state_blocked": "مسدود",
+        "policy_state_allowed": "مجاز",
+        "policy_state_neutral": "خنثی",
+        "policy_categories_title": "سیاست دسته‌ها:\n{categories}",
+        "policy_category_line": "{category}: {state}",
+        "policy_category_rule_updated": "وضعیت {category} به {state} تغییر کرد.",
+        "policy_category_rule_unchanged": "وضعیت {category} از قبل {state} بود.",
+        "policy_category_usage": "روش استفاده: /{command} <category>",
+        "policy_category_domain_usage": "روش استفاده: /{command} <category> <domain>",
+        "policy_category_domains": "دامنه‌های دسته‌بندی‌شده به‌عنوان {category}:\n{domains}",
+        "policy_invalid_category_or_domain": "دسته یا دامنه نامعتبر است. دسته‌های مجاز: {categories}.",
+        "policy_category_domain_added": "دامنه {domain} به دسته {category} افزوده شد.",
+        "policy_category_domain_exists": "دامنه {domain} از قبل در دسته {category} وجود دارد.",
+        "policy_category_domain_removed": "دامنه {domain} از دسته {category} حذف شد.",
+        "policy_category_domain_missing": "دامنه {domain} در دسته {category} پیدا نشد.",
         "policy_usage_domain": "روش استفاده: /{command} <domain>",
         "policy_usage_test": "روش استفاده: /policy_test <url>",
         "allowed": "مجاز",

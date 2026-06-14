@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.7.1-alpha.1] - 2026-06-15
+
+### Added
+
+- Configurable `adult`, `gambling`, `crypto`, `malware`, `phishing`, `dangerous`, `media`, and `custom` policy categories.
+- Admin commands for category state and category-domain management.
+- Atomic policy schema with allowed categories/keywords and backward migration from legacy category fields.
+- English and Persian category names, states, usage messages, and policy summaries.
+
+### Changed
+
+- New policies block only malware, phishing, and dangerous categories by default.
+- Built-in adult, gambling, crypto, and media lists now classify domains without automatically blocking them.
+- Search result filtering follows the administrator's current category choices.
+
+### Safety
+
+- URL/SSRF validation remains mandatory and cannot be overridden by policy allow rules.
+- Protected streaming download guardrails remain separate from media-category permissions.
+- No external classification, DRM/CAPTCHA/paywall bypass, media ripping, or credential storage was added.
+
 ## [v1.7.0-alpha.1] - 2026-06-15
 
 ### Added

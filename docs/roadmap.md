@@ -8,6 +8,7 @@ The project remains an alpha Telegram browser utility. Roadmap items are directi
 - More reliable provider-based search integrations
 - Optional Telegram Web App prototype
 - Better operational diagnostics and documentation
+- More complete administrator-maintained category classification lists
 
 ## Future
 
@@ -26,4 +27,5 @@ The project remains an alpha Telegram browser utility. Roadmap items are directi
 - Direct Google result-page scraping
 - Redis, Celery, or a database during the local-JSON alpha phase
 - DRM bypass or media ripping
+- Protected streaming media downloading
 - Username/password credential storage

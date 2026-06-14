@@ -78,6 +78,14 @@ Persian: یک نشانی عمومی مانند `https://example.com` بفرست�
 | `/reset_text <key> [lang]` | Reset an editable text override. |
 | `/preview_text <key> [lang]` | Preview the effective text. |
 | `/policy` | Show content policy state and rule counts. |
+| `/categories` | Show every category as blocked, allowed, or neutral. |
+| `/block_category <category>` | Block a category. |
+| `/allow_category <category>` | Explicitly allow a category. |
+| `/unblock_category <category>` | Remove a category block. |
+| `/unallow_category <category>` | Remove an explicit category allow. |
+| `/category_domains <category>` | List domains classified in a category. |
+| `/add_category_domain <category> <domain>` | Classify a domain under a category. |
+| `/remove_category_domain <category> <domain>` | Remove a domain from a category. |
 | `/block_domain <domain> [category]` | Block a domain, optionally adding it to a category list. |
 | `/allow_domain <domain>` | Explicitly allow a domain. |
 | `/unblock_domain <domain>` | Remove blocked/category rules for a domain. |
@@ -89,6 +97,8 @@ Persian: یک نشانی عمومی مانند `https://example.com` بفرست�
 | `/unroute_domain <domain>` | Remove a domain route rule. |
 | `/route_test <url>` | Show the selected route or missing configuration. |
 | `/refresh_commands` | Re-register Telegram native command menus. |
+
+Valid policy categories are `adult`, `gambling`, `crypto`, `malware`, `phishing`, `dangerous`, `media`, and `custom`. Built-in lists classify domains only; administrators choose which categories are blocked. Allowing `media` does not enable protected-streaming downloads.
 
 Examples:
 

@@ -65,8 +65,10 @@ class Settings(BaseSettings):
     interaction_max_elements: int = 10
     interaction_timeout_seconds: float = 30.0
     enable_builtin_safety_blocklist: bool = True
-    builtin_block_adult: bool = True
-    builtin_block_gambling: bool = True
+    builtin_adult_category_enabled: bool = True
+    builtin_gambling_category_enabled: bool = True
+    builtin_crypto_category_enabled: bool = True
+    builtin_media_category_enabled: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

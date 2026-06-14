@@ -62,6 +62,9 @@ Cards show the active provider name and note when fewer safe results are availab
 - API keys are not included in logs or user-facing errors.
 - Search sessions are owner-bound, expire, and persist locally across restarts.
 - Search result URLs are also checked against the administrator's content policy before storage and before opening a URL card.
+- Blocked keywords reject a query before provider access. Allowed keywords permit the query, while each result URL still receives normal URL/domain checks.
+- Category-classified results are filtered only when that category is blocked. Adult, gambling, crypto, and media are administrator-configurable.
+- Built-in category lists are small classification seeds, not a claim of complete content detection.
 
 General controls:
 

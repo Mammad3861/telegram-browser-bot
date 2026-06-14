@@ -20,9 +20,10 @@ from app.core.cookies import CookieValidationError, normalize_domain, validate_c
 from app.core.command_args import CommandArgumentError, parse_single_url_arg
 from app.core.cleanup import cleanup_generated_files
 from app.core.content_policy import (
-    CATEGORY_FIELDS,
+    POLICY_CATEGORIES,
     ContentPolicy,
     PolicyDecision,
+    add_category_domain,
     add_domain_rule,
     apply_builtin_safety_lists,
     check_query_allowed,
@@ -30,7 +31,9 @@ from app.core.content_policy import (
     is_protected_media_domain,
     load_content_policy,
     normalize_domain as normalize_policy_domain,
+    remove_category_domain,
     remove_domain_rule,
+    update_category_rule,
 )
 from app.core.bot_text_store import (
     BotTextValidationError,
@@ -148,15 +151,7 @@ HELP_TEXT = text("help", "en")
 pending_cookie_imports: dict[int, str] = {}
 pending_user_inputs: dict[int, str] = {}
 pending_interactions: dict[tuple[int, str], list[InteractiveElement]] = {}
-POLICY_CATEGORY_NAMES = (
-    "adult",
-    "gambling",
-    "malware",
-    "phishing",
-    "dangerous",
-    "media",
-    "custom",
-)
+POLICY_CATEGORY_NAMES = POLICY_CATEGORIES
 
 
 def begin_user_input(user_id: int, mode: str) -> None:
@@ -184,7 +179,11 @@ def current_content_policy() -> ContentPolicy:
     )
     if settings.enable_builtin_safety_blocklist:
         apply_builtin_safety_lists(
-            policy, settings.builtin_block_adult, settings.builtin_block_gambling
+            policy,
+            settings.builtin_adult_category_enabled,
+            settings.builtin_gambling_category_enabled,
+            settings.builtin_crypto_category_enabled,
+            settings.builtin_media_category_enabled,
         )
     return policy
 
@@ -370,8 +369,9 @@ async def menu_callback_handler(callback: CallbackQuery) -> None:
 
 async def perform_search(query: str) -> list[SearchResult]:
     settings = get_settings()
-    if settings.enable_content_policy and not check_query_allowed(
-        query, current_content_policy()
+    policy = current_content_policy()
+    if settings.enable_content_policy and policy.enabled and not check_query_allowed(
+        query, policy
     ).allowed:
         raise PermissionError("content_policy_blocked")
     limit = max(1, min(settings.search_results_limit, 5))
@@ -1083,10 +1083,13 @@ async def policy_handler(message: Message) -> None:
     await message.answer(text(
         "policy_status",
         language,
-        state=text("enabled" if settings.enable_content_policy else "disabled", language),
+        state=text(
+            "enabled" if settings.enable_content_policy and policy.enabled else "disabled",
+            language,
+        ),
         default_action=text(
             "allowed"
-            if settings.content_policy_default_action == "allow"
+            if policy.default_action == "allow"
             else "blocked",
             language,
         ),
@@ -1096,12 +1099,168 @@ async def policy_handler(message: Message) -> None:
             policy_category_label(category, language)
             for category in policy.blocked_categories
         ) or text("none", language),
+        allowed_categories=", ".join(
+            policy_category_label(category, language)
+            for category in policy.allowed_categories
+        ) or text("none", language),
+        configurable_categories=", ".join(
+            policy_category_label(category, language)
+            for category in POLICY_CATEGORIES
+        ),
         builtin_state=text(
             "enabled" if settings.enable_builtin_safety_blocklist else "disabled",
             language,
         ),
         updated_at=policy.updated_at,
     ))
+
+
+def category_state(policy: ContentPolicy, category: str) -> str:
+    if category in policy.allowed_categories:
+        return "allowed"
+    if category in policy.blocked_categories:
+        return "blocked"
+    return "neutral"
+
+
+def parse_policy_category(raw: str | None) -> str:
+    category = (raw or "").strip().lower()
+    if category not in POLICY_CATEGORIES:
+        raise ValueError("Invalid category")
+    return category
+
+
+@router.message(Command("categories"))
+async def categories_handler(message: Message) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    policy = current_content_policy()
+    lines = [
+        text(
+            "policy_category_line",
+            language,
+            category=policy_category_label(category, language),
+            state=text(f"policy_state_{category_state(policy, category)}", language),
+        )
+        for category in POLICY_CATEGORIES
+    ]
+    await message.answer(text("policy_categories_title", language, categories="\n".join(lines)))
+
+
+async def update_category_handler(
+    message: Message, command: CommandObject, allow: bool, remove: bool
+) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    try:
+        category = parse_policy_category(command.args)
+    except ValueError:
+        await message.answer(text(
+            "policy_invalid_category",
+            language,
+            categories=", ".join(POLICY_CATEGORIES),
+        ))
+        return
+    changed = update_category_rule(content_policy_path(), category, allow, remove)
+    current_state = category_state(load_content_policy(content_policy_path()), category)
+    await message.answer(text(
+        "policy_category_rule_updated" if changed else "policy_category_rule_unchanged",
+        language,
+        category=policy_category_label(category, language),
+        state=text(f"policy_state_{current_state}", language),
+    ))
+
+
+@router.message(Command("block_category"))
+async def block_category_handler(message: Message, command: CommandObject) -> None:
+    await update_category_handler(message, command, allow=False, remove=False)
+
+
+@router.message(Command("allow_category"))
+async def allow_category_handler(message: Message, command: CommandObject) -> None:
+    await update_category_handler(message, command, allow=True, remove=False)
+
+
+@router.message(Command("unblock_category"))
+async def unblock_category_handler(message: Message, command: CommandObject) -> None:
+    await update_category_handler(message, command, allow=False, remove=True)
+
+
+@router.message(Command("unallow_category"))
+async def unallow_category_handler(message: Message, command: CommandObject) -> None:
+    await update_category_handler(message, command, allow=True, remove=True)
+
+
+@router.message(Command("category_domains"))
+async def category_domains_handler(message: Message, command: CommandObject) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    try:
+        category = parse_policy_category(command.args)
+    except ValueError:
+        await message.answer(text("policy_category_usage", language, command="category_domains"))
+        return
+    domains = current_content_policy().category_domains.get(category, [])
+    await message.answer(text(
+        "policy_category_domains",
+        language,
+        category=policy_category_label(category, language),
+        domains="\n".join(domains) or text("none", language),
+    ))
+
+
+async def mutate_category_domain_handler(
+    message: Message, command: CommandObject, remove: bool
+) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    arguments = (command.args or "").split()
+    command_name = "remove_category_domain" if remove else "add_category_domain"
+    if len(arguments) != 2:
+        await message.answer(text("policy_category_domain_usage", language, command=command_name))
+        return
+    try:
+        category = parse_policy_category(arguments[0])
+        domain = normalize_policy_domain(arguments[1])
+        changed = (
+            remove_category_domain(content_policy_path(), category, domain)
+            if remove
+            else add_category_domain(content_policy_path(), category, domain)
+        )
+    except ValueError:
+        await message.answer(text(
+            "policy_invalid_category_or_domain",
+            language,
+            categories=", ".join(POLICY_CATEGORIES),
+        ))
+        return
+    await message.answer(text(
+        "policy_category_domain_removed" if remove and changed else
+        "policy_category_domain_missing" if remove else
+        "policy_category_domain_added" if changed else
+        "policy_category_domain_exists",
+        language,
+        category=policy_category_label(category, language),
+        domain=domain,
+    ))
+
+
+@router.message(Command("add_category_domain"))
+async def add_category_domain_handler(message: Message, command: CommandObject) -> None:
+    await mutate_category_domain_handler(message, command, remove=False)
+
+
+@router.message(Command("remove_category_domain"))
+async def remove_category_domain_handler(message: Message, command: CommandObject) -> None:
+    await mutate_category_domain_handler(message, command, remove=True)
 
 
 async def update_policy_domain(
@@ -1122,18 +1281,13 @@ async def update_policy_domain(
         await message.answer(text(key, language, command=command_name))
         return
     category = arguments[1].lower() if len(arguments) > 1 and not allow and not remove else None
-    if category and category not in {*CATEGORY_FIELDS, "custom"}:
+    if category and category not in POLICY_CATEGORIES:
         await message.answer(text(
             "policy_invalid_category",
             language,
-            categories=", ".join(
-                policy_category_label(value, language)
-                for value in POLICY_CATEGORY_NAMES
-            ),
+            categories=", ".join(POLICY_CATEGORY_NAMES),
         ))
         return
-    if category == "custom":
-        category = None
     try:
         domain = normalize_policy_domain(arguments[0])
         changed = (
