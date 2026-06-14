@@ -19,6 +19,17 @@ from app.core.download_quota import download_quota
 from app.core.cookies import CookieValidationError, normalize_domain, validate_cookies_json
 from app.core.command_args import CommandArgumentError, parse_single_url_arg
 from app.core.cleanup import cleanup_generated_files
+from app.core.content_policy import (
+    CATEGORY_FIELDS,
+    ContentPolicy,
+    PolicyDecision,
+    add_domain_rule,
+    check_url_allowed,
+    is_protected_media_domain,
+    load_content_policy,
+    normalize_domain as normalize_policy_domain,
+    remove_domain_rule,
+)
 from app.core.bot_text_store import (
     BotTextValidationError,
     EDITABLE_TEXT_KEYS,
@@ -42,6 +53,15 @@ from app.core.session_store import (
 )
 from app.core.runtime_status import RUNTIME_TARGET, build_admin_status
 from app.core.storage import StorageError
+from app.core.routing import (
+    RoutingError,
+    http_proxy_for_url,
+    load_route_rules,
+    playwright_proxy_for_route,
+    remove_route_rule,
+    route_for_url,
+    set_route_rule,
+)
 from app.core.temp_files import cleanup_sent_file
 from app.core.url_sessions import (
     URLSessionExpired,
@@ -83,6 +103,7 @@ from app.fetchers.browser_html import (
 )
 from app.fetchers.browser_diagnostics import map_browser_runtime_error
 from app.fetchers.file_downloader import DownloadError, FileDownloader
+from app.fetchers.file_detector import is_direct_file
 from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
 from app.version import APP_VERSION
@@ -120,6 +141,76 @@ pending_cookie_imports: dict[int, str] = {}
 
 def get_user_id(message: Message) -> int | None:
     return message.from_user.id if message.from_user else None
+
+
+def current_content_policy() -> ContentPolicy:
+    settings = get_settings()
+    return load_content_policy(
+        Path(settings.content_policy_path), settings.content_policy_default_action
+    )
+
+
+def policy_decision(url: str) -> PolicyDecision:
+    validate_url(url)
+    if not get_settings().enable_content_policy:
+        return PolicyDecision(True, "policy_disabled")
+    return check_url_allowed(url, current_content_policy())
+
+
+def is_policy_allowed(url: str) -> bool:
+    return policy_decision(url).allowed
+
+
+def route_name_for_url(url: str) -> str:
+    settings = get_settings()
+    return route_for_url(
+        url, Path(settings.domain_route_rules_path), settings.routing_profile
+    )
+
+
+def http_proxy_for_target(url: str) -> str | None:
+    settings = get_settings()
+    return http_proxy_for_url(
+        url,
+        route_name_for_url(url),
+        settings.http_proxy_url,
+        settings.https_proxy_url,
+    )
+
+
+def browser_proxy_for_target(url: str) -> str | None:
+    settings = get_settings()
+    return playwright_proxy_for_route(
+        route_name_for_url(url), settings.playwright_proxy_server
+    )
+
+
+def policy_block_message(language: str) -> str:
+    return text("content_policy_blocked", language)
+
+
+def validate_action_url(url: str, command: str | None = None) -> str:
+    validated = validate_url(url)
+    decision = policy_decision(validated)
+    if not decision.allowed:
+        raise PermissionError("content_policy_blocked")
+    hostname = urlparse(validated).hostname or ""
+    if (
+        command == "download"
+        and is_protected_media_domain(hostname)
+        and not is_direct_file(validated)
+    ):
+        raise PermissionError("protected_media_download")
+    return validated
+
+
+def permission_error_message(error: PermissionError, language: str) -> str:
+    return text(
+        "protected_media_download"
+        if str(error) == "protected_media_download"
+        else "content_policy_blocked",
+        language,
+    )
 
 
 async def reject_unless_allowed(message: Message) -> bool:
@@ -239,7 +330,8 @@ async def perform_search(query: str) -> list[SearchResult]:
         settings.brave_search_api_key,
         settings.searxng_base_url,
     )
-    return filter_safe_search_results(results, limit)
+    safe_results = filter_safe_search_results(results, limit)
+    return [result for result in safe_results if is_policy_allowed(result.url)][:limit]
 
 
 async def send_search_results(
@@ -353,9 +445,12 @@ async def search_callback_handler(callback: CallbackQuery) -> None:
             return
         result = session.results[parsed.index]
         try:
-            url = validate_url(result.url)
+            url = validate_action_url(result.url)
         except URLValidationError:
             await callback.answer(text("invalid_url", language), show_alert=True)
+            return
+        except PermissionError as exc:
+            await callback.answer(permission_error_message(exc, language), show_alert=True)
             return
         await callback.answer(text("search_opening", language))
         await create_url_card(message, user_id, url)
@@ -411,9 +506,18 @@ async def search_callback_handler(callback: CallbackQuery) -> None:
 
 async def create_url_card(message: Message, user_id: int, url: str) -> None:
     language = get_language(user_id)
+    try:
+        url = validate_action_url(url)
+    except PermissionError as exc:
+        await message.answer(permission_error_message(exc, language))
+        return
     session = url_session_store.create(user_id, url)
+    hostname = urlparse(url).hostname or ""
+    card_text = text("url_card", language, url=url)
+    if is_protected_media_domain(hostname):
+        card_text += "\n\n" + text("media_site_note", language)
     sent = await message.answer(
-        text("url_card", language, url=url),
+        card_text,
         reply_markup=url_action_keyboard(session.session_id, language),
     )
     url_session_store.touch(session.session_id, sent.message_id)
@@ -438,7 +542,7 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
             user_id,
             get_settings().url_session_ttl_minutes,
         )
-        validate_url(session.url)
+        validate_action_url(session.url, parsed.action)
     except (URLSessionNotFound, URLSessionExpired):
         await callback.answer(text("session_expired", language), show_alert=True)
         return
@@ -447,6 +551,9 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
         return
     except URLValidationError:
         await callback.answer(text("invalid_url", language), show_alert=True)
+        return
+    except PermissionError as exc:
+        await callback.answer(permission_error_message(exc, language), show_alert=True)
         return
 
     await callback.answer()
@@ -460,13 +567,20 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
     if parsed.action == "refresh":
         url_session_store.touch(session.session_id, message.message_id)
         await message.edit_text(
-            text("url_refreshed", language, url=session.url),
+            text("url_refreshed", language, url=session.url)
+            + (
+                "\n\n" + text("media_site_note", language)
+                if is_protected_media_domain(urlparse(session.url).hostname or "")
+                else ""
+            ),
             reply_markup=url_action_keyboard(session.session_id, language),
         )
         return
     if parsed.action == "links":
         try:
-            async with HttpFetcher() as fetcher:
+            async with HttpFetcher(
+                proxy_url=http_proxy_for_target(session.url)
+            ) as fetcher:
                 response = await fetcher.fetch(session.url)
             links = LinkExtractor.extract(
                 safe_response_text(response), str(response.url)
@@ -476,6 +590,8 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
             )
         except (URLValidationError, FetchError) as exc:
             await message.answer(text("request_failed", language, error=str(exc)))
+        except RoutingError:
+            await message.answer(text("proxy_not_configured", language))
         return
 
     command = "html_rendered" if parsed.action == "rendered_html" else parsed.action
@@ -487,6 +603,10 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
             await message.answer(text("daily_quota_exceeded", language))
             return
     try:
+        if command in {"html_rendered", "screenshot", "pdf"}:
+            browser_proxy_for_target(session.url)
+        else:
+            http_proxy_for_target(session.url)
         job = create_background_job_for_user(user_id, command, session.url)
         if command == "download":
             download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
@@ -509,6 +629,8 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
         job_store.register_task(job.id, task)
     except JobLimitError as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
+    except RoutingError:
+        await message.answer(text("proxy_not_configured", language))
 
 
 @router.message(Command("whoami"))
@@ -842,6 +964,204 @@ async def purge_history_handler(message: Message) -> None:
     await message.answer(text("purge_history_summary", language, count=purged))
 
 
+def content_policy_path() -> Path:
+    return Path(get_settings().content_policy_path)
+
+
+@router.message(Command("policy"))
+async def policy_handler(message: Message) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    settings = get_settings()
+    policy = current_content_policy()
+    await message.answer(text(
+        "policy_status",
+        language,
+        state=text("enabled" if settings.enable_content_policy else "disabled", language),
+        default_action=settings.content_policy_default_action,
+        blocked=len(policy.blocked_domains),
+        allowed=len(policy.allowed_domains),
+        categories=", ".join(policy.blocked_categories) or text("none", language),
+        updated_at=policy.updated_at,
+    ))
+
+
+async def update_policy_domain(
+    message: Message, command: CommandObject, allow: bool, remove: bool
+) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    arguments = (command.args or "").split()
+    command_name = (
+        "unallow_domain" if allow and remove else
+        "allow_domain" if allow else
+        "unblock_domain" if remove else "block_domain"
+    )
+    if not arguments:
+        key = "policy_usage_block" if not allow and not remove else "policy_usage_domain"
+        await message.answer(text(key, language, command=command_name))
+        return
+    category = arguments[1].lower() if len(arguments) > 1 and not allow and not remove else None
+    if category and category not in CATEGORY_FIELDS:
+        await message.answer(text("request_failed", language, error="Invalid category"))
+        return
+    try:
+        domain = normalize_policy_domain(arguments[0])
+        changed = (
+            remove_domain_rule(content_policy_path(), domain, allow)
+            if remove
+            else add_domain_rule(content_policy_path(), domain, allow, category)
+        )
+    except ValueError as exc:
+        await message.answer(text("request_failed", language, error=str(exc)))
+        return
+    await message.answer(text(
+        "policy_domain_removed" if remove and changed else
+        "policy_domain_missing" if remove else
+        "policy_domain_added" if changed else "policy_domain_exists",
+        language,
+        domain=domain,
+    ))
+
+
+@router.message(Command("block_domain"))
+async def block_domain_handler(message: Message, command: CommandObject) -> None:
+    await update_policy_domain(message, command, allow=False, remove=False)
+
+
+@router.message(Command("allow_domain"))
+async def allow_domain_handler(message: Message, command: CommandObject) -> None:
+    await update_policy_domain(message, command, allow=True, remove=False)
+
+
+@router.message(Command("unblock_domain"))
+async def unblock_domain_handler(message: Message, command: CommandObject) -> None:
+    await update_policy_domain(message, command, allow=False, remove=True)
+
+
+@router.message(Command("unallow_domain"))
+async def unallow_domain_handler(message: Message, command: CommandObject) -> None:
+    await update_policy_domain(message, command, allow=True, remove=True)
+
+
+@router.message(Command("policy_test"))
+async def policy_test_handler(message: Message, command: CommandObject) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    if not command.args:
+        await message.answer(text("policy_usage_test", language))
+        return
+    try:
+        decision = policy_decision(parse_single_url_arg(command.args))
+    except (CommandArgumentError, URLValidationError, ValueError) as exc:
+        await message.answer(text("request_failed", language, error=str(exc)))
+        return
+    await message.answer(text(
+        "policy_test_result",
+        language,
+        decision=text("allowed" if decision.allowed else "blocked", language),
+        reason=decision.reason,
+        category=decision.category or text("none", language),
+    ))
+
+
+@router.message(Command("policy_reload"))
+async def policy_reload_handler(message: Message) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    policy = current_content_policy()
+    await message.answer(text(
+        "policy_reloaded", get_language(admin_id), count=len(policy.blocked_domains)
+    ))
+
+
+@router.message(Command("routes"))
+async def routes_handler(message: Message) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    settings = get_settings()
+    rules = load_route_rules(Path(settings.domain_route_rules_path))
+    rendered = "\n".join(f"{rule.domain}: {rule.route}" for rule in rules)
+    await message.answer(text(
+        "routes_status",
+        language,
+        profile=settings.routing_profile,
+        rules=rendered or text("none", language),
+    ))
+
+
+@router.message(Command("route_domain"))
+async def route_domain_handler(message: Message, command: CommandObject) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    parts = (command.args or "").split()
+    if len(parts) != 2:
+        await message.answer(text("route_usage", language))
+        return
+    try:
+        domain = normalize_policy_domain(parts[0])
+        set_route_rule(Path(get_settings().domain_route_rules_path), domain, parts[1])
+    except ValueError as exc:
+        await message.answer(text("request_failed", language, error=str(exc)))
+        return
+    await message.answer(text("route_rule_set", language, domain=domain, route=parts[1]))
+
+
+@router.message(Command("unroute_domain"))
+async def unroute_domain_handler(message: Message, command: CommandObject) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    if not command.args:
+        await message.answer(text("unroute_usage", language))
+        return
+    try:
+        domain = normalize_policy_domain(command.args)
+        changed = remove_route_rule(Path(get_settings().domain_route_rules_path), domain)
+    except ValueError as exc:
+        await message.answer(text("request_failed", language, error=str(exc)))
+        return
+    await message.answer(text(
+        "route_rule_removed" if changed else "route_rule_missing", language, domain=domain
+    ))
+
+
+@router.message(Command("route_test"))
+async def route_test_handler(message: Message, command: CommandObject) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    if not command.args:
+        await message.answer(text("route_test_usage", language))
+        return
+    try:
+        url = validate_url(parse_single_url_arg(command.args))
+        domain = urlparse(url).hostname or ""
+        route = route_name_for_url(url)
+        if route == "proxy":
+            http_proxy_for_target(url)
+    except RoutingError:
+        await message.answer(text("proxy_not_configured", language))
+        return
+    except (CommandArgumentError, URLValidationError, ValueError) as exc:
+        await message.answer(text("request_failed", language, error=str(exc)))
+        return
+    await message.answer(text("route_test_result", language, domain=domain, route=route))
+
+
 @router.message(Command("cookies_help"))
 async def cookies_help_handler(message: Message) -> None:
     if await reject_unless_allowed(message):
@@ -919,8 +1239,8 @@ async def fetch_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = parse_single_url_arg(command.args)
-        async with HttpFetcher() as fetcher:
+        url = validate_action_url(parse_single_url_arg(command.args), "fetch")
+        async with HttpFetcher(proxy_url=http_proxy_for_target(url)) as fetcher:
             response = await fetcher.fetch(url)
         body = safe_response_text(response)[:3500]
         await message.answer(
@@ -928,6 +1248,10 @@ async def fetch_handler(message: Message, command: CommandObject) -> None:
         )
     except CommandArgumentError:
         await message.answer(text("url_usage", language, command="fetch"))
+    except PermissionError as exc:
+        await message.answer(permission_error_message(exc, language))
+    except RoutingError:
+        await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, FetchError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
 
@@ -938,8 +1262,8 @@ async def links_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = parse_single_url_arg(command.args)
-        async with HttpFetcher() as fetcher:
+        url = validate_action_url(parse_single_url_arg(command.args), "links")
+        async with HttpFetcher(proxy_url=http_proxy_for_target(url)) as fetcher:
             response = await fetcher.fetch(url)
         links = LinkExtractor.extract(safe_response_text(response), str(response.url))
         if not links:
@@ -949,6 +1273,10 @@ async def links_handler(message: Message, command: CommandObject) -> None:
         await message.answer(output[:4000])
     except CommandArgumentError:
         await message.answer(text("url_usage", language, command="links"))
+    except PermissionError as exc:
+        await message.answer(permission_error_message(exc, language))
+    except RoutingError:
+        await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, FetchError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
 
@@ -959,7 +1287,8 @@ async def html_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_url(parse_single_url_arg(command.args))
+        url = validate_action_url(parse_single_url_arg(command.args), "html")
+        http_proxy_for_target(url)
         job = create_background_job(message, "html", url)
         await message.answer(text(
             "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
@@ -968,6 +1297,10 @@ async def html_handler(message: Message, command: CommandObject) -> None:
         job_store.register_task(job.id, task)
     except CommandArgumentError:
         await message.answer(text("url_usage", language, command="html"))
+    except PermissionError as exc:
+        await message.answer(permission_error_message(exc, language))
+    except RoutingError:
+        await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
 
@@ -1002,7 +1335,9 @@ async def run_html_job(job: Job, message: Message) -> None:
     language = get_language(job.user_id)
     job_store.update_job(job.id, status="running", progress=10)
     try:
-        async with HttpFetcher(max_response_bytes=0) as fetcher:
+        async with HttpFetcher(
+            max_response_bytes=0, proxy_url=http_proxy_for_target(job.url)
+        ) as fetcher:
             response = await fetcher.fetch(job.url)
         job_store.update_job(job.id, progress=60)
         output_path = save_html(
@@ -1028,6 +1363,8 @@ async def run_html_job(job: Job, message: Message) -> None:
         raise
     except (URLValidationError, FetchError, StorageError, OSError, TelegramAPIError) as exc:
         await fail_job(job.id, message, str(exc))
+    except RoutingError:
+        await fail_job(job.id, message, text("proxy_not_configured", language))
     except Exception:
         await fail_job(job.id, message, text("job_unexpected_failure", language))
 
@@ -1038,7 +1375,8 @@ async def rendered_html_handler(message: Message, command: CommandObject) -> Non
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_url(parse_single_url_arg(command.args))
+        url = validate_action_url(parse_single_url_arg(command.args), "html_rendered")
+        browser_proxy_for_target(url)
         job = create_background_job(message, "html_rendered", url)
         await message.answer(text(
             "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
@@ -1047,6 +1385,10 @@ async def rendered_html_handler(message: Message, command: CommandObject) -> Non
         job_store.register_task(job.id, task)
     except CommandArgumentError:
         await message.answer(text("url_usage", language, command="html_rendered"))
+    except PermissionError as exc:
+        await message.answer(permission_error_message(exc, language))
+    except RoutingError:
+        await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
 
@@ -1064,6 +1406,7 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
             viewport_height=settings.screenshot_viewport_height,
             minimum_free_mb=settings.min_free_disk_mb,
             cookies=browser_cookies_for_job(job),
+            proxy_server=browser_proxy_for_target(job.url),
         )
         result = await export_rendered_html(
             job.url, Path(settings.downloads_dir), options
@@ -1113,6 +1456,8 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
         safe_message = text("telegram_rendered_html_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
+    except RoutingError:
+        await fail_job(job.id, message, text("proxy_not_configured", language))
     except Exception as exc:
         safe_message = text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)
@@ -1144,7 +1489,8 @@ async def download_handler(message: Message, command: CommandObject) -> None:
         return
 
     try:
-        url = validate_url(parse_single_url_arg(command.args))
+        url = validate_action_url(parse_single_url_arg(command.args), "download")
+        http_proxy_for_target(url)
         job = create_background_job(message, "download", url)
         download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
         await message.answer(text(
@@ -1154,6 +1500,10 @@ async def download_handler(message: Message, command: CommandObject) -> None:
         job_store.register_task(job.id, task)
     except CommandArgumentError:
         await message.answer(text("url_usage", language, command="download"))
+    except PermissionError as exc:
+        await message.answer(permission_error_message(exc, language))
+    except RoutingError:
+        await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
 
@@ -1163,7 +1513,7 @@ async def run_download_job(job: Job, message: Message) -> None:
     language = get_language(job.user_id)
     job_store.update_job(job.id, status="running", progress=10)
     try:
-        async with FileDownloader() as downloader:
+        async with FileDownloader(proxy_url=http_proxy_for_target(job.url)) as downloader:
             result = await downloader.download(
                 job.url,
                 Path(settings.downloads_dir),
@@ -1201,6 +1551,8 @@ async def run_download_job(job: Job, message: Message) -> None:
         await fail_job(job.id, message, safe_message)
     except (URLValidationError, DownloadError, StorageError, OSError) as exc:
         await fail_job(job.id, message, str(exc))
+    except RoutingError:
+        await fail_job(job.id, message, text("proxy_not_configured", language))
     except Exception:
         await fail_job(job.id, message, text("job_unexpected_failure", language))
 
@@ -1211,7 +1563,8 @@ async def screenshot_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_url(parse_single_url_arg(command.args))
+        url = validate_action_url(parse_single_url_arg(command.args), "screenshot")
+        browser_proxy_for_target(url)
         job = create_background_job(message, "screenshot", url)
         await message.answer(text(
             "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
@@ -1220,6 +1573,10 @@ async def screenshot_handler(message: Message, command: CommandObject) -> None:
         job_store.register_task(job.id, task)
     except CommandArgumentError:
         await message.answer(text("url_usage", language, command="screenshot"))
+    except PermissionError as exc:
+        await message.answer(permission_error_message(exc, language))
+    except RoutingError:
+        await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
 
@@ -1236,6 +1593,7 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
             max_size_mb=settings.max_screenshot_size_mb,
             minimum_free_mb=settings.min_free_disk_mb,
             cookies=browser_cookies_for_job(job),
+            proxy_server=browser_proxy_for_target(job.url),
         )
         result = await capture_screenshot(
             job.url, Path(settings.downloads_dir), options
@@ -1284,6 +1642,8 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
         safe_message = text("telegram_screenshot_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
+    except RoutingError:
+        await fail_job(job.id, message, text("proxy_not_configured", language))
     except Exception as exc:
         safe_message = text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)
@@ -1296,7 +1656,8 @@ async def pdf_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_url(parse_single_url_arg(command.args))
+        url = validate_action_url(parse_single_url_arg(command.args), "pdf")
+        browser_proxy_for_target(url)
         job = create_background_job(message, "pdf", url)
         await message.answer(text(
             "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
@@ -1305,6 +1666,10 @@ async def pdf_handler(message: Message, command: CommandObject) -> None:
         job_store.register_task(job.id, task)
     except CommandArgumentError:
         await message.answer(text("url_usage", language, command="pdf"))
+    except PermissionError as exc:
+        await message.answer(permission_error_message(exc, language))
+    except RoutingError:
+        await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
 
@@ -1321,6 +1686,7 @@ async def run_pdf_job(job: Job, message: Message) -> None:
             max_size_mb=settings.max_pdf_size_mb,
             minimum_free_mb=settings.min_free_disk_mb,
             cookies=browser_cookies_for_job(job),
+            proxy_server=browser_proxy_for_target(job.url),
         )
         result = await export_pdf(job.url, Path(settings.downloads_dir), options)
         job_store.update_job(job.id, progress=90)
@@ -1367,6 +1733,8 @@ async def run_pdf_job(job: Job, message: Message) -> None:
         safe_message = text("telegram_pdf_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
+    except RoutingError:
+        await fail_job(job.id, message, text("proxy_not_configured", language))
     except Exception as exc:
         safe_message = text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)

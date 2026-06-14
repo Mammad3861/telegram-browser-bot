@@ -65,6 +65,12 @@ def test_admin_command_list_builder() -> None:
         "set_text",
         "reset_text",
         "preview_text",
+        "policy",
+        "block_domain",
+        "allow_domain",
+        "policy_test",
+        "routes",
+        "route_domain",
     ]
 
 
@@ -82,6 +88,12 @@ def test_persian_admin_command_list_builder() -> None:
         "set_text",
         "reset_text",
         "preview_text",
+        "policy",
+        "block_domain",
+        "allow_domain",
+        "policy_test",
+        "routes",
+        "route_domain",
     ]
     assert commands[0].description == "نمایش وضعیت اجرا"
 
@@ -124,7 +136,7 @@ def test_registration_includes_default_localized_and_admin_scopes() -> None:
     assert bot.calls[1]["commands"][1].description == "باز کردن منوی اصلی"
     admin_calls = bot.calls[2:]
     assert {call["scope"].chat_id for call in admin_calls} == {123, 456}
-    assert all(len(call["commands"]) == 18 for call in admin_calls)
+    assert all(len(call["commands"]) == 24 for call in admin_calls)
     assert all(
         call["commands"][0].description == (
             "شروع ربات" if call.get("language_code") == "fa" else "Start the bot"

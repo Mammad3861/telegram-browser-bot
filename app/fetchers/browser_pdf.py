@@ -13,6 +13,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
 from app.core.storage import ensure_free_space
+from app.core.content_policy import validate_configured_policy
 from app.core.url_validation import URLValidationError, validate_url
 from app.fetchers.browser_context import create_isolated_context
 from app.fetchers.browser_diagnostics import (
@@ -50,6 +51,7 @@ class PdfOptions:
     max_size_mb: int = 30
     minimum_free_mb: int = 512
     cookies: tuple[dict, ...] = ()
+    proxy_server: str | None = None
 
 
 @dataclass(frozen=True)
@@ -75,7 +77,10 @@ def validate_pdf_size(path: Path, max_size_mb: int | float) -> int:
 
 
 async def _validate_browser_target(url: str) -> None:
-    validate_url(url)
+    try:
+        validate_configured_policy(url)
+    except ValueError as exc:
+        raise URLValidationError(str(exc)) from exc
     hostname = urlparse(url).hostname
     if not hostname:
         raise URLValidationError("URL must include a hostname")
@@ -100,7 +105,10 @@ async def export_pdf(url: str, output_dir: Path, options: PdfOptions) -> PdfResu
 
     try:
         async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(headless=True)
+            browser = await playwright.chromium.launch(
+                headless=True,
+                proxy={"server": options.proxy_server} if options.proxy_server else None,
+            )
             try:
                 context = await create_isolated_context(browser, options.cookies)
                 page = await context.new_page()

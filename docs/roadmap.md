@@ -15,6 +15,8 @@ The project remains an alpha Telegram browser utility. Roadmap items are directi
 - Richer URL, search, and browser-session cards
 - Better integrations with supported search APIs and self-hosted providers
 - Stronger persistent quotas and job infrastructure when operational needs justify it
+- Controlled in-bot navigation using screenshots and validated clickable links
+- Additional optional administrator-provided outbound routing profiles
 
 ## Not Planned For Now
 
@@ -23,3 +25,5 @@ The project remains an alpha Telegram browser utility. Roadmap items are directi
 - CAPTCHA or anti-bot bypass
 - Direct Google result-page scraping
 - Redis, Celery, or a database during the local-JSON alpha phase
+- DRM bypass or media ripping
+- Username/password credential storage

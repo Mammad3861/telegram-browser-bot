@@ -52,6 +52,12 @@ def build_admin_commands(language: str = "en") -> list[BotCommand]:
             "set_text": "تنظیم متن ربات",
             "reset_text": "بازنشانی متن ربات",
             "preview_text": "پیش‌نمایش متن ربات",
+            "policy": "نمایش سیاست محتوا",
+            "block_domain": "مسدود کردن دامنه",
+            "allow_domain": "مجاز کردن دامنه",
+            "policy_test": "آزمایش سیاست محتوا",
+            "routes": "نمایش مسیرهای خروجی",
+            "route_domain": "تنظیم مسیر دامنه",
         }
         if language == "fa"
         else {
@@ -65,6 +71,12 @@ def build_admin_commands(language: str = "en") -> list[BotCommand]:
             "set_text": "Set a bot text",
             "reset_text": "Reset a bot text",
             "preview_text": "Preview a bot text",
+            "policy": "Show content policy",
+            "block_domain": "Block a domain",
+            "allow_domain": "Allow a domain",
+            "policy_test": "Test content policy",
+            "routes": "Show outbound routes",
+            "route_domain": "Set a domain route",
         }
     )
     return [

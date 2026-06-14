@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.config import get_settings
+from app.core.content_policy import validate_configured_policy
 from app.core.url_validation import URLValidationError, validate_url
 
 
@@ -45,6 +46,7 @@ class HttpFetcher:
         self,
         transport: httpx.AsyncBaseTransport | None = None,
         max_response_bytes: int | None = None,
+        proxy_url: str | None = None,
     ) -> None:
         settings = get_settings()
         self.max_response_bytes = (
@@ -52,13 +54,16 @@ class HttpFetcher:
             if max_response_bytes is None
             else max_response_bytes
         )
-        self.client = httpx.AsyncClient(
+        client_options: dict[str, object] = dict(
             timeout=settings.request_timeout_seconds,
             follow_redirects=True,
             headers=DEFAULT_HEADERS,
             transport=transport,
             event_hooks={"request": [self._validate_request]},
         )
+        if proxy_url and transport is None:
+            client_options["proxy"] = proxy_url
+        self.client = httpx.AsyncClient(**client_options)
 
     async def __aenter__(self) -> "HttpFetcher":
         return self
@@ -67,7 +72,10 @@ class HttpFetcher:
         await self.client.aclose()
 
     async def _validate_destination(self, url: str) -> None:
-        validate_url(url)
+        try:
+            validate_configured_policy(url)
+        except ValueError as exc:
+            raise URLValidationError(str(exc)) from exc
         hostname = urlparse(url).hostname
         if not hostname:
             raise URLValidationError("URL must include a hostname")

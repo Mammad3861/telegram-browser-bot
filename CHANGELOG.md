@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.6.0-alpha.1] - 2026-06-15
+
+### Added
+
+- Atomic local content policy with domain, keyword, and lightweight category rules.
+- Admin policy inspection, mutation, testing, and reload commands.
+- Optional per-domain `default` or `proxy` outbound routing using explicit admin-provided URLs.
+- Admin route listing, mutation, and testing commands.
+- Safe media-site card guidance and protected streaming page download guardrails.
+
+### Safety
+
+- Content policy is enforced before URL cards, search-result opening, HTTP actions, downloads, and browser jobs.
+- Redirected HTTP and browser destinations retain SSRF and content-policy checks.
+- No protected-media extraction, DRM/paywall/CAPTCHA bypass, credential storage, system routing, or firewall changes were added.
+
 ## [v1.5.2-alpha.1] - 2026-06-15
 
 ### Fixed

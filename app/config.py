@@ -52,6 +52,14 @@ class Settings(BaseSettings):
     search_session_max_stored: int = 300
     job_history_path: str = "downloads/jobs/job_history.json"
     job_history_max_stored: int = 1000
+    content_policy_path: str = "downloads/policies/content_policy.json"
+    enable_content_policy: bool = True
+    content_policy_default_action: str = "allow"
+    routing_profile: str = "default"
+    http_proxy_url: str = ""
+    https_proxy_url: str = ""
+    playwright_proxy_server: str = ""
+    domain_route_rules_path: str = "downloads/policies/route_rules.json"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

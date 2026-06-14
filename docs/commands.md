@@ -75,6 +75,17 @@ Persian: یک نشانی عمومی مانند `https://example.com` بفرست�
 | `/set_text <key> <lang> <text>` | Set `welcome`, `help`, or `about`. |
 | `/reset_text <key> [lang]` | Reset an editable text override. |
 | `/preview_text <key> [lang]` | Preview the effective text. |
+| `/policy` | Show content policy state and rule counts. |
+| `/block_domain <domain> [category]` | Block a domain, optionally adding it to a category list. |
+| `/allow_domain <domain>` | Explicitly allow a domain. |
+| `/unblock_domain <domain>` | Remove blocked/category rules for a domain. |
+| `/unallow_domain <domain>` | Remove an explicit allow rule. |
+| `/policy_test <url>` | Show the current decision for a URL. |
+| `/policy_reload` | Reload and summarize the policy file. |
+| `/routes` | List configured domain route rules. |
+| `/route_domain <domain> <default\|proxy>` | Set a domain route. |
+| `/unroute_domain <domain>` | Remove a domain route rule. |
+| `/route_test <url>` | Show the selected route or missing configuration. |
 
 Examples:
 

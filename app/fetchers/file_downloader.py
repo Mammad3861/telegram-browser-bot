@@ -37,8 +37,9 @@ class FileDownloader(HttpFetcher):
     def __init__(
         self,
         transport: httpx.AsyncBaseTransport | None = None,
+        proxy_url: str | None = None,
     ) -> None:
-        super().__init__(transport=transport, max_response_bytes=0)
+        super().__init__(transport=transport, max_response_bytes=0, proxy_url=proxy_url)
 
     async def download(
         self,

@@ -47,6 +47,8 @@ def test_cleanup_never_touches_sessions_or_access(tmp_path) -> None:
         tmp_path / "ui_sessions" / "url_sessions.json",
         tmp_path / "ui_sessions" / "search_sessions.json",
         tmp_path / "jobs" / "job_history.json",
+        tmp_path / "policies" / "content_policy.json",
+        tmp_path / "policies" / "route_rules.json",
     ]
     for path in protected_files:
         path.parent.mkdir(parents=True, exist_ok=True)

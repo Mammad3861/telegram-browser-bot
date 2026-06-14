@@ -81,6 +81,28 @@ See [Web Search](search.md) for provider limitations.
 
 Active jobs remain in memory. Only safe completed-job summaries are persisted, using URL domains instead of full URLs.
 
+## Content Policy
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CONTENT_POLICY_PATH` | `downloads/policies/content_policy.json` | Atomic local domain/category policy store. |
+| `ENABLE_CONTENT_POLICY` | `true` | Enforces policy before cards, fetches, downloads, and browser jobs. |
+| `CONTENT_POLICY_DEFAULT_ACTION` | `allow` | Action for domains without a matching rule: `allow` or `block`. |
+
+The policy supports explicit blocked/allowed domains, blocked keywords, and lightweight domain lists for media, gambling, adult, and dangerous categories. Explicit allow rules override category rules, but never override URL validation or private/internal destination protection. No external classification service is called.
+
+## Outbound Routing
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `ROUTING_PROFILE` | `default` | Fallback route: `default` or `proxy`. |
+| `DOMAIN_ROUTE_RULES_PATH` | `downloads/policies/route_rules.json` | Atomic per-domain route rules. |
+| `HTTP_PROXY_URL` | empty | Explicit proxy URL for HTTPX HTTP targets. |
+| `HTTPS_PROXY_URL` | empty | Explicit proxy URL for HTTPX HTTPS targets. |
+| `PLAYWRIGHT_PROXY_SERVER` | empty | Explicit Playwright proxy server URL. |
+
+Only proxy URLs supplied by the administrator are used. The application does not install or manage proxy software, alter system routes, or modify firewall rules. A domain assigned to `proxy` fails safely when the required proxy URL is missing.
+
 ## Cookie Sessions
 
 | Variable | Default | Description |

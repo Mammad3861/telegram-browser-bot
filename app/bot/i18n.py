@@ -173,6 +173,37 @@ TEXTS: dict[str, dict[str, str]] = {
         "telegram_pdf_failed": "Telegram could not send the PDF file.",
         "browser_request_failed": "Browser request failed.",
         "job_unexpected_failure": "Job failed unexpectedly.",
+        "content_policy_blocked": "This site is blocked by the bot content policy.",
+        "protected_media_download": "Direct download from protected streaming platforms is not supported.",
+        "media_site_note": (
+            "Some media sites may not work fully inside the bot. Browser actions are limited "
+            "to safe previews and exports."
+        ),
+        "proxy_not_configured": "Proxy route is not configured.",
+        "policy_status": (
+            "Content policy: {state}\nDefault action: {default_action}\n"
+            "Blocked domains: {blocked}\nAllowed domains: {allowed}\n"
+            "Blocked categories: {categories}\nUpdated: {updated_at}"
+        ),
+        "policy_domain_added": "Policy rule added for {domain}.",
+        "policy_domain_exists": "Policy rule already exists for {domain}.",
+        "policy_domain_removed": "Policy rule removed for {domain}.",
+        "policy_domain_missing": "Policy rule was not found for {domain}.",
+        "policy_test_result": "Policy test: {decision}\nReason: {reason}\nCategory: {category}",
+        "policy_reloaded": "Content policy reloaded. Blocked domains: {count}.",
+        "policy_usage_block": "Usage: /block_domain <domain> [category]",
+        "policy_usage_domain": "Usage: /{command} <domain>",
+        "policy_usage_test": "Usage: /policy_test <url>",
+        "allowed": "allowed",
+        "blocked": "blocked",
+        "routes_status": "Routing profile: {profile}\nRules:\n{rules}",
+        "route_rule_set": "Route for {domain} set to {route}.",
+        "route_rule_removed": "Route rule removed for {domain}.",
+        "route_rule_missing": "Route rule was not found for {domain}.",
+        "route_test_result": "Route for {domain}: {route}",
+        "route_usage": "Usage: /route_domain <domain> <default|proxy>",
+        "unroute_usage": "Usage: /unroute_domain <domain>",
+        "route_test_usage": "Usage: /route_test <url>",
         "texts_overview": (
             "Editable text keys: welcome, help, about\nLanguages: en, fa\n"
             "Use /set_text, /reset_text, and /preview_text."
@@ -346,6 +377,37 @@ TEXTS: dict[str, dict[str, str]] = {
         "telegram_pdf_failed": "تلگرام نتوانست فایل PDF را ارسال کند.",
         "browser_request_failed": "درخواست مرورگر ناموفق بود.",
         "job_unexpected_failure": "کار به‌طور غیرمنتظره ناموفق بود.",
+        "content_policy_blocked": "این سایت طبق سیاست محتوایی بات مسدود شده است.",
+        "protected_media_download": "دانلود مستقیم از پلتفرم‌های استریم یا محتوای محافظت‌شده پشتیبانی نمی‌شود.",
+        "media_site_note": (
+            "برخی سایت‌های رسانه‌ای ممکن است داخل بات کامل کار نکنند. عملیات مرورگر به "
+            "پیش‌نمایش و خروجی امن محدود است."
+        ),
+        "proxy_not_configured": "مسیر پراکسی تنظیم نشده است.",
+        "policy_status": (
+            "سیاست محتوا: {state}\nعمل پیش‌فرض: {default_action}\n"
+            "دامنه‌های مسدود: {blocked}\nدامنه‌های مجاز: {allowed}\n"
+            "دسته‌های مسدود: {categories}\nآخرین تغییر: {updated_at}"
+        ),
+        "policy_domain_added": "قانون سیاست برای {domain} افزوده شد.",
+        "policy_domain_exists": "قانون سیاست برای {domain} از قبل وجود دارد.",
+        "policy_domain_removed": "قانون سیاست برای {domain} حذف شد.",
+        "policy_domain_missing": "قانون سیاست برای {domain} پیدا نشد.",
+        "policy_test_result": "آزمایش سیاست: {decision}\nدلیل: {reason}\nدسته: {category}",
+        "policy_reloaded": "سیاست محتوا دوباره بارگذاری شد. دامنه‌های مسدود: {count}.",
+        "policy_usage_block": "روش استفاده: /block_domain <domain> [category]",
+        "policy_usage_domain": "روش استفاده: /{command} <domain>",
+        "policy_usage_test": "روش استفاده: /policy_test <url>",
+        "allowed": "مجاز",
+        "blocked": "مسدود",
+        "routes_status": "پروفایل مسیریابی: {profile}\nقوانین:\n{rules}",
+        "route_rule_set": "مسیر {domain} روی {route} تنظیم شد.",
+        "route_rule_removed": "قانون مسیر {domain} حذف شد.",
+        "route_rule_missing": "قانون مسیر {domain} پیدا نشد.",
+        "route_test_result": "مسیر {domain}: {route}",
+        "route_usage": "روش استفاده: /route_domain <domain> <default|proxy>",
+        "unroute_usage": "روش استفاده: /unroute_domain <domain>",
+        "route_test_usage": "روش استفاده: /route_test <url>",
         "texts_overview": (
             "کلیدهای متن قابل ویرایش: welcome, help, about\nزبان‌ها: en, fa\n"
             "از /set_text، /reset_text و /preview_text استفاده کنید."

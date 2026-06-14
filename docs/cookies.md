@@ -53,3 +53,5 @@ Then send a Playwright-compatible JSON list:
 - Keep the same encryption key across deployments or existing sessions cannot be decrypted.
 - HTTPX commands such as `/fetch` and `/html` do not use saved browser cookies.
 - No username/password credentials are requested or stored.
+- Imported cookies do not enable protected-media downloads or restricted playback extraction.
+- Cookie sessions do not bypass DRM, paywalls, CAPTCHAs, or anti-bot controls.

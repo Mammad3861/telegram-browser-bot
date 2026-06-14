@@ -61,6 +61,7 @@ Cards show the active provider name and note when fewer safe results are availab
 - Search queries are not written to application logs.
 - API keys are not included in logs or user-facing errors.
 - Search sessions are owner-bound, expire, and persist locally across restarts.
+- Search result URLs are also checked against the administrator's content policy before storage and before opening a URL card.
 
 General controls:
 
