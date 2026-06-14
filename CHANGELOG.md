@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.4.1-alpha.1] - 2026-06-14
+
+### Documentation
+
+- Simplified the README into a concise GitHub landing page and Docker quick start.
+- Split deployment, configuration, commands, search, cookies, troubleshooting, and roadmap guidance into dedicated docs.
+- Clarified search-provider limitations and safe result URL validation.
+- Clarified that OpenAI/ChatGPT features, username/password login storage, CAPTCHA bypass, and direct Google scraping are not planned for now.
+
+### UX
+
+- Improved English and Persian search-unavailable messages with a direct-URL fallback suggestion.
+
 ## [v1.4.0-alpha.1] - 2026-06-14
 
 ### Added

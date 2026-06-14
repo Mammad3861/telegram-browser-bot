@@ -37,7 +37,9 @@ TEXTS: dict[str, dict[str, str]] = {
         "search_help": "Use /search your query to search the web.",
         "search_usage": "Usage: /search your query",
         "search_query_too_long": "Search query must be at most {max_length} characters.",
-        "search_unavailable": "Search is temporarily unavailable. Please try again later.",
+        "search_unavailable": (
+            "Search is temporarily unavailable. Try again later or send a direct URL."
+        ),
         "search_no_results": "No safe search results were found.",
         "search_results": "🔎 Results for: {query}",
         "search_expired": "This search session expired. Please search again.",
@@ -97,7 +99,9 @@ TEXTS: dict[str, dict[str, str]] = {
         "search_help": "برای جست‌وجوی وب از /search عبارت موردنظر استفاده کنید.",
         "search_usage": "روش استفاده: /search عبارت جست‌وجو",
         "search_query_too_long": "عبارت جست‌وجو باید حداکثر {max_length} نویسه باشد.",
-        "search_unavailable": "جست‌وجو موقتاً در دسترس نیست. بعداً دوباره تلاش کنید.",
+        "search_unavailable": (
+            "جست‌وجو موقتاً در دسترس نیست. بعداً دوباره تلاش کنید یا یک نشانی مستقیم بفرستید."
+        ),
         "search_no_results": "نتیجه امنی برای جست‌وجو پیدا نشد.",
         "search_results": "🔎 نتایج برای: {query}",
         "search_expired": "نشست جست‌وجو منقضی شده است. دوباره جست‌وجو کنید.",
