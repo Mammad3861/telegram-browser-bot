@@ -9,6 +9,7 @@ from app.api.routes import router
 from app.bot.dispatcher import create_dispatcher
 from app.bot.commands import register_bot_commands
 from app.config import get_settings
+from app.core.config_validation import ensure_startup_directories, validate_startup_config
 from app.version import APP_VERSION
 
 
@@ -17,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    settings = get_settings()
+    settings = validate_startup_config(get_settings())
+    ensure_startup_directories(settings)
     polling_task: asyncio.Task[None] | None = None
     bot: Bot | None = None
 

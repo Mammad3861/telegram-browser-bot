@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -20,6 +21,7 @@ from app.core.download_requests import download_request_store
 from app.core.cookies import CookieValidationError, normalize_domain, validate_cookies_json
 from app.core.command_args import CommandArgumentError, parse_single_url_arg
 from app.core.cleanup import cleanup_generated_files
+from app.core.error_mapping import user_safe_error_message
 from app.core.content_policy import (
     POLICY_CATEGORIES,
     ContentPolicy,
@@ -60,6 +62,8 @@ from app.core.session_store import (
 )
 from app.core.runtime_status import RUNTIME_TARGET, build_admin_status
 from app.core.storage import StorageError
+from app.core.storage_diagnostics import build_storage_summary
+from app.core.rate_limit import effective_rate_limit, rate_limiter
 from app.core.routing import (
     RoutingError,
     http_proxy_for_url,
@@ -129,6 +133,7 @@ from app.version import APP_VERSION
 from app.search.providers import (
     SearchConfigurationError,
     SearchDisabledError,
+    SearchProviderError,
     SearchResult,
     provider_display_name,
     search_web,
@@ -162,6 +167,7 @@ pending_download_candidates: dict[tuple[int, str], list[tuple[str, str]]] = {}
 forced_download_jobs: set[str] = set()
 job_tab_ids: dict[str, str] = {}
 POLICY_CATEGORY_NAMES = POLICY_CATEGORIES
+BROWSER_RATE_COMMANDS = {"html", "html_rendered", "rendered_html", "screenshot", "pdf"}
 
 
 def begin_user_input(user_id: int, mode: str) -> None:
@@ -274,11 +280,56 @@ def permission_error_message(error: PermissionError, language: str) -> str:
     )
 
 
+def _command_name(message: Message) -> str:
+    text_value = message.text or ""
+    first = text_value.split(maxsplit=1)[0].lstrip("/")
+    return first.split("@", 1)[0].lower()
+
+
+async def reject_if_rate_limited(
+    message: Message, bucket: str, limit: int, window_seconds: int, key: str
+) -> bool:
+    user_id = get_user_id(message)
+    if user_id is None:
+        return False
+    settings = get_settings()
+    result = rate_limiter.check(
+        user_id,
+        bucket,
+        effective_rate_limit(limit, is_admin(user_id), settings.admin_rate_limit_multiplier),
+        window_seconds,
+    )
+    if not result.allowed:
+        await message.answer(
+            text(key, get_language(user_id), seconds=result.retry_after_seconds)
+        )
+        return True
+    return False
+
+
 async def reject_unless_allowed(message: Message) -> bool:
     user_id = get_user_id(message)
     if user_id is None or not is_allowed_user(user_id):
         await message.answer(text("access_denied", get_language(user_id)))
         return True
+    settings = get_settings()
+    if await reject_if_rate_limited(
+        message,
+        "actions",
+        settings.max_actions_per_user_per_minute,
+        60,
+        "rate_limited",
+    ):
+        return True
+    command_name = _command_name(message)
+    if command_name in BROWSER_RATE_COMMANDS:
+        return await reject_if_rate_limited(
+            message,
+            "browser",
+            settings.max_browser_actions_per_user_per_hour,
+            3600,
+            "browser_rate_limited",
+        )
     return False
 
 
@@ -365,6 +416,7 @@ async def menu_callback_handler(callback: CallbackQuery) -> None:
             is_admin(user_id),
             job_store,
             Path(get_settings().job_history_path),
+            get_settings().job_result_keep_hours,
         )
         await callback.message.answer(
             "\n\n".join(
@@ -454,6 +506,14 @@ async def search_handler(message: Message, command: CommandObject) -> None:
         await message.answer(text("search_unavailable", language))
         return
     settings = get_settings()
+    if await reject_if_rate_limited(
+        message,
+        "search",
+        settings.max_searches_per_user_per_hour,
+        3600,
+        "search_rate_limited",
+    ):
+        return
     try:
         query = validate_search_query(command.args, settings.search_query_max_length)
     except SearchQueryError:
@@ -475,6 +535,9 @@ async def search_handler(message: Message, command: CommandObject) -> None:
     except SearchConfigurationError:
         logger.warning("Search provider is misconfigured")
         await message.answer(text("search_misconfigured", language))
+    except SearchProviderError as exc:
+        logger.warning("Search provider failed: exception_type=%s", type(exc).__name__)
+        await message.answer(user_safe_error_message(exc, language))
     except PermissionError as exc:
         await message.answer(permission_error_message(exc, language))
     except Exception as exc:
@@ -1069,36 +1132,77 @@ async def admin_status_handler(message: Message) -> None:
         language,
         version=status.version,
         runtime_target=status.runtime_target,
+        uptime_seconds=status.uptime_seconds,
+        downloads_dir=status.downloads_dir,
         active_jobs=status.active_jobs,
         known_jobs=status.known_jobs,
+        recent_completed_jobs=status.recent_completed_jobs,
+        url_sessions=status.url_sessions,
+        search_sessions=status.search_sessions,
+        browser_tab_sessions=status.browser_tab_sessions,
         runtime_users=status.runtime_allowed_users,
         free_bytes=status.storage_free_bytes,
         cookie_state=text("enabled" if status.cookie_import_enabled else "disabled", language),
+        policy_state=text("enabled" if status.content_policy_enabled else "disabled", language),
+        search_provider=status.search_provider,
+        command_menu_mode=status.command_menu_mode,
+        download_mode=status.download_mode,
+        cleanup_hours=status.cleanup_max_age_hours,
+        cleanup_after_send=text("enabled" if status.cleanup_after_send_enabled else "disabled", language),
+        browser_state=text("ready" if status.browser_features_configured else "missing", language),
         directories=directories,
     ))
 
 
 @router.message(Command("cleanup"))
-async def cleanup_handler(message: Message) -> None:
+async def cleanup_handler(message: Message, command: CommandObject) -> None:
     user_id = get_user_id(message)
     if user_id is None or not is_admin(user_id):
         await message.answer(text("admin_required", get_language(user_id)))
         return
     language = get_language(user_id)
     settings = get_settings()
+    dry_run = (command.args or "").strip().lower() in {"dry_run", "dry-run"}
     try:
         result = cleanup_generated_files(
-            Path(settings.downloads_dir), settings.cleanup_max_age_hours
+            Path(settings.downloads_dir), settings.cleanup_max_age_hours, dry_run=dry_run
         )
     except OSError:
         await message.answer(text("cleanup_failed", language))
         return
     await message.answer(text(
-        "cleanup_summary",
+        "cleanup_dry_run_summary" if result.dry_run else "cleanup_summary",
         language,
         count=result.deleted_files,
         bytes=result.freed_bytes,
     ))
+
+
+@router.message(Command("storage"))
+async def storage_handler(message: Message) -> None:
+    user_id = get_user_id(message)
+    if user_id is None or not is_admin(user_id):
+        await message.answer(text("admin_required", get_language(user_id)))
+        return
+    language = get_language(user_id)
+    settings = get_settings()
+    summary = build_storage_summary(
+        Path(settings.downloads_dir), settings.cleanup_max_age_hours
+    )
+    categories = "\n".join(
+        text("storage_category_line", language, category=name, bytes=size)
+        for name, size in summary.categories.items()
+    )
+    await message.answer(
+        text(
+            "storage_summary",
+            language,
+            downloads_dir=str(summary.downloads_dir),
+            free_bytes=summary.free_bytes,
+            cleanup_hours=summary.cleanup_max_age_hours,
+            categories=categories,
+        )
+    )
 
 
 @router.message(Command("purge_history"))
@@ -1604,7 +1708,7 @@ async def fetch_handler(message: Message, command: CommandObject) -> None:
     except RoutingError:
         await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, FetchError) as exc:
-        await message.answer(text("request_failed", language, error=str(exc)))
+        await message.answer(user_safe_error_message(exc, language))
 
 
 @router.message(Command("links"))
@@ -1629,7 +1733,7 @@ async def links_handler(message: Message, command: CommandObject) -> None:
     except RoutingError:
         await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, FetchError) as exc:
-        await message.answer(text("request_failed", language, error=str(exc)))
+        await message.answer(user_safe_error_message(exc, language))
 
 
 @router.message(Command("html"))
@@ -1653,7 +1757,7 @@ async def html_handler(message: Message, command: CommandObject) -> None:
     except RoutingError:
         await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError) as exc:
-        await message.answer(text("request_failed", language, error=str(exc)))
+        await message.answer(user_safe_error_message(exc, language))
 
 
 def create_background_job(message: Message, command: str, url: str) -> Job:
@@ -1726,7 +1830,7 @@ async def run_html_job(job: Job, message: Message) -> None:
             job_store.update_job(job.id, status="cancelled")
         raise
     except (URLValidationError, FetchError, StorageError, OSError, TelegramAPIError) as exc:
-        await fail_job(job.id, message, str(exc))
+        await fail_job(job.id, message, user_safe_error_message(exc, language))
     except RoutingError:
         await fail_job(job.id, message, text("proxy_not_configured", language))
     except Exception:
@@ -1754,7 +1858,7 @@ async def rendered_html_handler(message: Message, command: CommandObject) -> Non
     except RoutingError:
         await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError) as exc:
-        await message.answer(text("request_failed", language, error=str(exc)))
+        await message.answer(user_safe_error_message(exc, language))
 
 
 async def run_rendered_html_job(job: Job, message: Message) -> None:
@@ -1817,8 +1921,9 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
         StorageError,
         OSError,
     ) as exc:
-        log_safe_job_error(job, exc, str(exc))
-        await fail_job(job.id, message, str(exc))
+        safe_message = user_safe_error_message(exc, language)
+        log_safe_job_error(job, exc, safe_message)
+        await fail_job(job.id, message, safe_message)
     except TelegramAPIError as exc:
         safe_message = text("telegram_rendered_html_failed", language)
         log_safe_job_error(job, exc, safe_message)
@@ -1938,7 +2043,7 @@ async def download_handler(message: Message, command: CommandObject) -> None:
     except RoutingError:
         await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError, DownloadError) as exc:
-        await message.answer(text("request_failed", language, error=str(exc)))
+        await message.answer(user_safe_error_message(exc, language))
 
 
 async def run_download_job(job: Job, message: Message) -> None:
@@ -1989,7 +2094,7 @@ async def run_download_job(job: Job, message: Message) -> None:
         safe_error = (
             text("direct_file_only", language)
             if "only supports direct file links" in str(exc)
-            else str(exc)
+            else user_safe_error_message(exc, language)
         )
         await fail_job(job.id, message, safe_error)
     except RoutingError:
@@ -2019,7 +2124,7 @@ async def screenshot_handler(message: Message, command: CommandObject) -> None:
     except RoutingError:
         await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError) as exc:
-        await message.answer(text("request_failed", language, error=str(exc)))
+        await message.answer(user_safe_error_message(exc, language))
 
 
 async def run_screenshot_job(job: Job, message: Message) -> None:
@@ -2080,8 +2185,9 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
         StorageError,
         OSError,
     ) as exc:
-        log_safe_job_error(job, exc, str(exc))
-        await fail_job(job.id, message, str(exc))
+        safe_message = user_safe_error_message(exc, language)
+        log_safe_job_error(job, exc, safe_message)
+        await fail_job(job.id, message, safe_message)
     except TelegramAPIError as exc:
         safe_message = text("telegram_screenshot_failed", language)
         log_safe_job_error(job, exc, safe_message)
@@ -2116,7 +2222,7 @@ async def pdf_handler(message: Message, command: CommandObject) -> None:
     except RoutingError:
         await message.answer(text("proxy_not_configured", language))
     except (URLValidationError, JobLimitError) as exc:
-        await message.answer(text("request_failed", language, error=str(exc)))
+        await message.answer(user_safe_error_message(exc, language))
 
 
 async def run_pdf_job(job: Job, message: Message) -> None:
@@ -2175,8 +2281,9 @@ async def run_pdf_job(job: Job, message: Message) -> None:
         StorageError,
         OSError,
     ) as exc:
-        log_safe_job_error(job, exc, str(exc))
-        await fail_job(job.id, message, str(exc))
+        safe_message = user_safe_error_message(exc, language)
+        log_safe_job_error(job, exc, safe_message)
+        await fail_job(job.id, message, safe_message)
     except TelegramAPIError as exc:
         safe_message = text("telegram_pdf_failed", language)
         log_safe_job_error(job, exc, safe_message)
@@ -2260,6 +2367,7 @@ def list_job_records(
     is_admin_user: bool,
     store: JobStore,
     history_path: Path,
+    keep_hours: int | None = None,
 ) -> list[Job | JobHistoryEntry]:
     active_jobs = store.list_jobs() if is_admin_user else store.list_user_jobs(user_id)
     history_jobs = (
@@ -2267,6 +2375,13 @@ def list_job_records(
         if is_admin_user
         else list_user_job_history(history_path, user_id)
     )
+    if keep_hours is not None and keep_hours > 0:
+        cutoff = datetime.now(UTC) - timedelta(hours=keep_hours)
+        history_jobs = [
+            job
+            for job in history_jobs
+            if (job.finished_at or job.created_at) >= cutoff
+        ]
     active_ids = {job.id for job in active_jobs}
     combined: list[Job | JobHistoryEntry] = active_jobs + [
         job for job in history_jobs if job.job_id not in active_ids
@@ -2289,10 +2404,11 @@ async def status_handler(message: Message, command: CommandObject) -> None:
     job = get_job_status_record(
         command.args.strip(),
         user_id,
-        is_admin(user_id),
-        job_store,
-        Path(get_settings().job_history_path),
-    )
+            is_admin(user_id),
+            job_store,
+            Path(get_settings().job_history_path),
+            get_settings().job_result_keep_hours,
+        )
     if job is None:
         await message.answer(text("job_not_found", language))
         return
@@ -2317,6 +2433,7 @@ async def jobs_handler(message: Message) -> None:
         is_admin(user_id),
         job_store,
         Path(get_settings().job_history_path),
+        get_settings().job_result_keep_hours,
     )
     if not jobs:
         await message.answer(text("no_jobs", language))
@@ -2515,6 +2632,15 @@ async def text_message_handler(message: Message) -> None:
             query = validate_search_query(
                 message.text, get_settings().search_query_max_length
             )
+            settings = get_settings()
+            if await reject_if_rate_limited(
+                message,
+                "search",
+                settings.max_searches_per_user_per_hour,
+                3600,
+                "search_rate_limited",
+            ):
+                return
             await send_search_results(message, user_id, query, language)
         except SearchQueryError:
             await message.answer(text("search_usage", language))
@@ -2522,6 +2648,8 @@ async def text_message_handler(message: Message) -> None:
             await message.answer(text("search_disabled", language))
         except SearchConfigurationError:
             await message.answer(text("search_misconfigured", language))
+        except SearchProviderError as exc:
+            await message.answer(user_safe_error_message(exc, language))
         except PermissionError as exc:
             await message.answer(permission_error_message(exc, language))
         except Exception:

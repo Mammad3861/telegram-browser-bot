@@ -125,6 +125,10 @@ class SearchSessionStore:
             self._sessions.clear()
             self._save()
 
+    def count(self) -> int:
+        with self._lock:
+            return len(self._sessions)
+
     def create(
         self,
         user_id: int,

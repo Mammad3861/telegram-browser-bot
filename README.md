@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml)
 
-**Current version:** `v1.8.0-alpha.1`
+**Current version:** `v1.9.0-alpha.1`
 
 A Docker-first Telegram bot for safely fetching pages, searching the web, extracting links, downloading direct files, and exporting HTML, screenshots, and PDFs. The supported production target is Ubuntu 24.04 or Docker Compose.
 
@@ -18,7 +18,7 @@ A Docker-first Telegram bot for safely fetching pages, searching the web, extrac
 - Persistent URL/search sessions and completed-job history
 - Encrypted per-user, per-domain Playwright cookie sessions
 - SSRF protection, download limits, disk checks, and automatic temporary-file cleanup
-- Docker Compose deployment with a localhost-only health endpoint
+- Docker Compose deployment with localhost-only health, readiness, and liveness endpoints
 
 ## Quick Start
 
@@ -45,6 +45,7 @@ Check the service:
 ```bash
 docker compose logs -f
 curl http://127.0.0.1:18080/health
+curl http://127.0.0.1:18080/health/ready
 ```
 
 ## Basic Usage
@@ -54,6 +55,8 @@ curl http://127.0.0.1:18080/health
 - Use the tab buttons for links, screenshots, PDF, HTML, downloads, navigation, and explicit safe interaction.
 
 Advanced slash commands remain available. See the [complete command reference](docs/commands.md).
+
+Admins can use `/admin_status`, `/storage`, and `/cleanup dry_run` for safe beta diagnostics.
 
 ## Documentation
 

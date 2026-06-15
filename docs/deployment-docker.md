@@ -51,7 +51,11 @@ Check health:
 
 ```bash
 curl http://127.0.0.1:18080/health
+curl http://127.0.0.1:18080/health/live
+curl http://127.0.0.1:18080/health/ready
 ```
+
+`/health/live` confirms the process is alive. `/health/ready` checks writable storage, valid search provider configuration, browser availability where practical, and free disk space above `MIN_FREE_DISK_MB`.
 
 Stop the service:
 
@@ -76,6 +80,8 @@ docker compose logs -f
 ```
 
 The persistent `downloads` mount is retained. Back up `.env` and `downloads/` before major upgrades.
+
+For beta operations, use `/admin_status`, `/storage`, and `/cleanup dry_run` before changing limits or pruning old files.
 
 If ownership changes after an update:
 

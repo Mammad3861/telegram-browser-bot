@@ -149,10 +149,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "purge_history_summary": "Job history cleared. Removed entries: {count}",
         "invalid_action": "Invalid action.",
         "admin_status": (
-            "Version: {version}\nRuntime target: {runtime_target}\nActive jobs: {active_jobs}\n"
-            "Known jobs: {known_jobs}\nRuntime allowed users: {runtime_users}\n"
-            "Storage free: {free_bytes} bytes\nCookie import: {cookie_state}\n"
-            "Generated directories: {directories}"
+            "Version: {version}\nRuntime target: {runtime_target}\nUptime: {uptime_seconds}s\n"
+            "Downloads directory: {downloads_dir}\nStorage free: {free_bytes} bytes\n"
+            "Active jobs: {active_jobs}\nKnown jobs: {known_jobs}\nRecent completed jobs: {recent_completed_jobs}\n"
+            "URL sessions: {url_sessions}\nSearch sessions: {search_sessions}\nBrowser tab sessions: {browser_tab_sessions}\n"
+            "Runtime allowed users: {runtime_users}\nCookie import: {cookie_state}\n"
+            "Content policy: {policy_state}\nSearch provider: {search_provider}\n"
+            "Command menu mode: {command_menu_mode}\nDownload mode: {download_mode}\n"
+            "Cleanup: {cleanup_hours}h, after-send {cleanup_after_send}\n"
+            "Browser features: {browser_state}\nGenerated directories: {directories}"
         ),
         "ready": "ready",
         "missing": "missing",
@@ -297,6 +302,36 @@ TEXTS: dict[str, dict[str, str]] = {
         "text_empty": "Text cannot be empty.",
         "text_key_required": "Text key is required.",
         "set_text_usage": "Usage: /set_text <key> <lang> <text>",
+        "cleanup_dry_run_summary": (
+            "Cleanup dry run complete.\nFiles that would be deleted: {count}\n"
+            "Bytes that would be freed: {bytes}"
+        ),
+        "storage_summary": (
+            "Storage summary\nDownloads directory: {downloads_dir}\nFree space: {free_bytes} bytes\n"
+            "Cleanup retention: {cleanup_hours} hours\n\n{categories}"
+        ),
+        "storage_category_line": "{category}: {bytes} bytes",
+        "rate_limited": "You are doing that too often. Try again in about {seconds} seconds.",
+        "search_rate_limited": "Search limit reached. Try again in about {seconds} seconds.",
+        "browser_rate_limited": "Browser action limit reached. Try again in about {seconds} seconds.",
+        "job_status_expired": "expired",
+        "job_retryable_hint": "\nThis may work if you try again later.",
+        "error_timeout": "The request timed out.",
+        "error_connect": "Could not connect to the remote site.",
+        "error_http_403": "The site refused this request.",
+        "error_http_404": "The page was not found.",
+        "error_http_410": "The page is no longer available.",
+        "error_http_429": "The site is rate-limiting requests.",
+        "error_http_5xx": "The remote site returned a server error.",
+        "error_file_too_large": "The file is too large for the configured limits.",
+        "error_disk_low": "The server does not have enough free disk space.",
+        "error_provider_unavailable": "The provider is unavailable. You can send a direct URL instead.",
+        "error_browser_failed": "Browser rendering failed. Try again later or use a direct HTTP action.",
+        "error_content_policy_blocked": "This request is blocked by the bot content policy.",
+        "error_protected_media_blocked": "Protected media downloads are not supported.",
+        "error_route_not_configured": "The selected outbound route is not configured.",
+        "error_generic": "The request could not be completed safely.",
+        "error_retryable_hint": " You can try again later.",
     },
     "fa": {
         "welcome": "مرورگر تلگرامی\nیک نشانی بفرستید یا جست‌وجو کنید.",
@@ -434,10 +469,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "purge_history_summary": "تاریخچه کارها پاک شد. ورودی‌های حذف‌شده: {count}",
         "invalid_action": "عملیات نامعتبر است.",
         "admin_status": (
-            "نسخه: {version}\nمحیط اجرا: {runtime_target}\nکارهای فعال: {active_jobs}\n"
-            "کارهای ثبت‌شده: {known_jobs}\nکاربران مجاز پویا: {runtime_users}\n"
-            "فضای آزاد: {free_bytes} بایت\nورود کوکی: {cookie_state}\n"
-            "پوشه‌های خروجی: {directories}"
+            "نسخه: {version}\nمحیط اجرا: {runtime_target}\nزمان اجرا: {uptime_seconds} ثانیه\n"
+            "پوشه دانلودها: {downloads_dir}\nفضای آزاد: {free_bytes} بایت\n"
+            "کارهای فعال: {active_jobs}\nکارهای ثبت‌شده: {known_jobs}\nکارهای تکمیل‌شده اخیر: {recent_completed_jobs}\n"
+            "نشست‌های URL: {url_sessions}\nنشست‌های جست‌وجو: {search_sessions}\nنشست‌های تب مرورگر: {browser_tab_sessions}\n"
+            "کاربران مجاز پویا: {runtime_users}\nورود کوکی: {cookie_state}\n"
+            "سیاست محتوا: {policy_state}\nارائه‌دهنده جست‌وجو: {search_provider}\n"
+            "حالت منوی دستورها: {command_menu_mode}\nحالت دانلود: {download_mode}\n"
+            "پاک‌سازی: {cleanup_hours} ساعت، پس از ارسال {cleanup_after_send}\n"
+            "قابلیت‌های مرورگر: {browser_state}\nپوشه‌های خروجی: {directories}"
         ),
         "ready": "آماده",
         "missing": "ناموجود",
@@ -582,6 +622,36 @@ TEXTS: dict[str, dict[str, str]] = {
         "text_empty": "متن نمی‌تواند خالی باشد.",
         "text_key_required": "کلید متن لازم است.",
         "set_text_usage": "روش استفاده: /set_text <key> <lang> <text>",
+        "cleanup_dry_run_summary": (
+            "بررسی پاک‌سازی انجام شد.\nفایل‌هایی که حذف می‌شوند: {count}\n"
+            "فضایی که آزاد می‌شود: {bytes} بایت"
+        ),
+        "storage_summary": (
+            "گزارش فضای ذخیره‌سازی\nپوشه دانلودها: {downloads_dir}\nفضای آزاد: {free_bytes} بایت\n"
+            "نگه‌داری پاک‌سازی: {cleanup_hours} ساعت\n\n{categories}"
+        ),
+        "storage_category_line": "{category}: {bytes} بایت",
+        "rate_limited": "این کار را بیش از حد سریع انجام می‌دهید. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
+        "search_rate_limited": "سقف جست‌وجو پر شده است. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
+        "browser_rate_limited": "سقف عملیات مرورگر پر شده است. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
+        "job_status_expired": "منقضی‌شده",
+        "job_retryable_hint": "\nممکن است با تلاش دوباره در زمان بعدی انجام شود.",
+        "error_timeout": "زمان درخواست تمام شد.",
+        "error_connect": "اتصال به سایت مقصد ممکن نشد.",
+        "error_http_403": "سایت این درخواست را نپذیرفت.",
+        "error_http_404": "صفحه پیدا نشد.",
+        "error_http_410": "صفحه دیگر در دسترس نیست.",
+        "error_http_429": "سایت تعداد درخواست‌ها را محدود کرده است.",
+        "error_http_5xx": "سایت مقصد خطای سرور برگرداند.",
+        "error_file_too_large": "فایل از محدودیت‌های تنظیم‌شده بزرگ‌تر است.",
+        "error_disk_low": "فضای آزاد سرور برای این کار کافی نیست.",
+        "error_provider_unavailable": "ارائه‌دهنده در دسترس نیست. می‌توانید یک لینک مستقیم بفرستید.",
+        "error_browser_failed": "رندر مرورگر انجام نشد. بعداً دوباره تلاش کنید یا از عملیات HTTP مستقیم استفاده کنید.",
+        "error_content_policy_blocked": "این درخواست طبق سیاست محتوای بات مسدود است.",
+        "error_protected_media_blocked": "دانلود محتوای رسانه‌ای محافظت‌شده پشتیبانی نمی‌شود.",
+        "error_route_not_configured": "مسیر خروجی انتخاب‌شده تنظیم نشده است.",
+        "error_generic": "درخواست به شکل امن قابل انجام نبود.",
+        "error_retryable_hint": " می‌توانید بعداً دوباره تلاش کنید.",
     },
 }
 

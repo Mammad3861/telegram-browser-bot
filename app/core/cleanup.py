@@ -10,12 +10,14 @@ GENERATED_DIRECTORIES = ("html", "html_rendered", "files", "screenshots", "pdf")
 class CleanupResult:
     deleted_files: int
     freed_bytes: int
+    dry_run: bool = False
 
 
 def cleanup_generated_files(
     downloads_dir: Path,
     max_age_hours: int,
     now: datetime | None = None,
+    dry_run: bool = False,
 ) -> CleanupResult:
     cutoff = (now or datetime.now(UTC)) - timedelta(hours=max_age_hours)
     deleted_files = 0
@@ -32,8 +34,11 @@ def cleanup_generated_files(
             if modified_at >= cutoff:
                 continue
             size = path.stat().st_size
-            path.unlink()
+            if not dry_run:
+                path.unlink()
             deleted_files += 1
             freed_bytes += size
 
-    return CleanupResult(deleted_files=deleted_files, freed_bytes=freed_bytes)
+    return CleanupResult(
+        deleted_files=deleted_files, freed_bytes=freed_bytes, dry_run=dry_run
+    )

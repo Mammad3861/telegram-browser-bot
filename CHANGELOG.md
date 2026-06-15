@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.9.0-alpha.1] - 2026-06-16
+
+### Added
+
+- Structured `/health/live` and `/health/ready` endpoints for process and readiness checks.
+- Expanded `/admin_status` with uptime, storage, session counts, content policy, search, command menu, download mode, cleanup, and browser diagnostics.
+- Admin `/storage` command for category-level downloads usage.
+- `/cleanup dry_run` preview mode.
+- In-memory rate limits for protected actions, search, and browser jobs.
+- Central safe error mapping for common timeout, HTTP, provider, browser, disk, routing, policy, and file-size failures.
+
+### Improved
+
+- Startup validation now falls back safely for invalid search provider, download mode, command menu mode, and content policy default action.
+- `/jobs` hides old completed history according to `JOB_RESULT_KEEP_HOURS`.
+- Documentation now includes beta-readiness diagnostics, health endpoints, storage checks, cleanup dry runs, and rate-limit settings.
+
+### Safety
+
+- Diagnostics avoid secrets, API keys, cookie values, proxy URLs, and full sensitive URLs.
+- No database, Redis, OpenAI/ChatGPT features, media ripping, CAPTCHA bypass, DRM bypass, or paywall bypass was added.
+
 ## [v1.8.0-alpha.1] - 2026-06-15
 
 ### Added

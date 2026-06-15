@@ -6,6 +6,8 @@ The bot checks free space before creating output. Increase available disk space 
 
 Persistent `sessions`, `access`, `preferences`, `texts`, `ui_sessions`, and `jobs` stores are intentionally preserved.
 
+Use `/storage` to view category sizes and `/cleanup dry_run` to preview old generated files before deleting them.
+
 ## Docker Permission Denied
 
 The container runs as a non-root user. Fix ownership on the bind mount:
@@ -47,6 +49,24 @@ With `DOWNLOAD_MODE=confirm_unknown`, uncertain links show a confirmation card. 
 
 `duckduckgo_html` is a basic alpha provider and can fail because of upstream changes, rate limits, or network restrictions. Try again later or send a direct URL to use the normal action card. Check `SEARCH_PROVIDER` and container logs.
 
+If `SEARCH_PROVIDER` is invalid at startup, the bot logs a warning and disables search safely.
+
+## Health And Readiness
+
+Use:
+
+```bash
+curl http://127.0.0.1:18080/health
+curl http://127.0.0.1:18080/health/live
+curl http://127.0.0.1:18080/health/ready
+```
+
+Readiness can be degraded by unwritable storage, invalid provider configuration, missing browser files, or disk space below `MIN_FREE_DISK_MB`.
+
+## Rate Limits
+
+Per-user in-memory limits protect the bot during alpha and beta testing. Tune `MAX_ACTIONS_PER_USER_PER_MINUTE`, `MAX_SEARCHES_PER_USER_PER_HOUR`, `MAX_BROWSER_ACTIONS_PER_USER_PER_HOUR`, and `ADMIN_RATE_LIMIT_MULTIPLIER` if legitimate users are slowed down.
+
 ## Telegram Command Menu Cache
 
 Telegram's native bottom command menu follows the Telegram client's language and the Bot API command `language_code`. It does not follow the language selected with the bot's `/language` command.
@@ -58,10 +78,10 @@ Telegram clients may cache command menu updates. Confirm `REGISTER_BOT_COMMANDS=
 ## HTTP And Network Problems
 
 - HTTP 403 usually means the site blocks automated requests.
-- VPN, proxy, DNS, firewall, or regional restrictions can cause connection failures.
+- Proxy, DNS, firewall, or regional network restrictions can cause connection failures.
 - JavaScript-heavy pages may work better with `/html_rendered` or `/screenshot`.
 - A decoding error may be avoided by using a Playwright command on the supported Linux/Docker runtime.
 
 ## Windows Development
 
-Windows is best-effort only. Async Playwright subprocess behavior and VPN networking may differ from Ubuntu. The application intentionally does not install a Windows-specific event loop policy. Reproduce browser issues on Ubuntu 24.04 or Docker before reporting them.
+Windows is best-effort only. Async Playwright subprocess behavior and local networking may differ from Ubuntu. The application intentionally does not install a Windows-specific event loop policy. Reproduce browser issues on Ubuntu 24.04 or Docker before reporting them.

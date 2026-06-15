@@ -74,8 +74,8 @@ async def register_bot_commands(bot: Bot, settings: Settings) -> bool:
         mode = settings.command_menu_language_mode.lower()
         if settings.force_persian_command_menu and mode == "auto":
             mode = "force_fa"
-        if mode not in {"auto", "force_fa", "force_en"}:
-            mode = "auto"
+        if mode not in {"auto", "force_fa", "force_en", "minimal"}:
+            mode = "minimal"
         default_language = "fa" if mode == "force_fa" else "en"
         if settings.reset_telegram_commands_on_start:
             await bot.delete_my_commands(scope=BotCommandScopeDefault())
@@ -85,7 +85,7 @@ async def register_bot_commands(bot: Bot, settings: Settings) -> bool:
         await bot.set_my_commands(
             build_default_commands(default_language), scope=BotCommandScopeDefault()
         )
-        if mode != "force_en":
+        if mode not in {"force_en", "minimal"}:
             await bot.set_my_commands(
                 build_default_commands("fa"),
                 scope=BotCommandScopeDefault(),
@@ -96,7 +96,7 @@ async def register_bot_commands(bot: Bot, settings: Settings) -> bool:
                 build_default_commands("en") + build_admin_commands("en"),
                 scope=BotCommandScopeChat(chat_id=admin_id),
             )
-            if mode != "force_en":
+            if mode not in {"force_en", "minimal"}:
                 await bot.set_my_commands(
                     build_default_commands("fa") + build_admin_commands("fa"),
                     scope=BotCommandScopeChat(chat_id=admin_id),

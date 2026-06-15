@@ -23,6 +23,21 @@ def test_cleanup_deletes_old_generated_files(tmp_path) -> None:
     assert not old_file.exists()
     assert result.deleted_files == 1
     assert result.freed_bytes == len(b"old output")
+    assert result.dry_run is False
+
+
+def test_cleanup_dry_run_keeps_old_generated_files(tmp_path) -> None:
+    old_file = tmp_path / "pdf" / "old.pdf"
+    old_file.parent.mkdir(parents=True)
+    old_file.write_bytes(b"old output")
+    set_file_age(old_file, 25)
+
+    result = cleanup_generated_files(tmp_path, max_age_hours=24, now=NOW, dry_run=True)
+
+    assert old_file.exists()
+    assert result.deleted_files == 1
+    assert result.freed_bytes == len(b"old output")
+    assert result.dry_run is True
 
 
 def test_cleanup_keeps_recent_generated_files(tmp_path) -> None:

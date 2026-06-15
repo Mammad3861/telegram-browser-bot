@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     search_session_max_stored: int = 300
     job_history_path: str = "downloads/jobs/job_history.json"
     job_history_max_stored: int = 1000
+    job_result_keep_hours: int = 24
     content_policy_path: str = "downloads/policies/content_policy.json"
     enable_content_policy: bool = True
     content_policy_default_action: str = "allow"
@@ -73,6 +74,10 @@ class Settings(BaseSettings):
     builtin_gambling_category_enabled: bool = True
     builtin_crypto_category_enabled: bool = True
     builtin_media_category_enabled: bool = True
+    max_actions_per_user_per_minute: int = 20
+    max_searches_per_user_per_hour: int = 30
+    max_browser_actions_per_user_per_hour: int = 60
+    admin_rate_limit_multiplier: int = 5
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -74,6 +74,8 @@ Examples:
 | `/allowed_users` | List static and runtime allowed users. |
 | `/admin_status` | Show safe runtime and storage diagnostics. |
 | `/cleanup` | Delete old generated files. |
+| `/cleanup dry_run` | Show what cleanup would delete without deleting files. |
+| `/storage` | Show downloads directory usage by category. |
 | `/purge_history` | Clear completed-job history without touching active jobs. |
 | `/texts` | List editable bot text keys and languages. |
 | `/set_text <key> <lang> <text>` | Set `welcome`, `help`, or `about`. |
@@ -108,4 +110,6 @@ Examples:
 /allow 123456789 teammate
 /set_text welcome fa خوش آمدید
 /cleanup
+/cleanup dry_run
+/storage
 ```

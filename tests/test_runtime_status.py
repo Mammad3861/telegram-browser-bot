@@ -5,7 +5,7 @@ from app.api import routes
 from app.config import Settings
 from app.core.access_store import add_allowed_user
 from app.core.jobs import JobStore
-from app.core.runtime_status import build_admin_status
+from app.core.runtime_status import build_admin_status, readiness_payload
 
 
 def make_settings(tmp_path, **overrides) -> Settings:
@@ -35,7 +35,7 @@ def test_health_response_shape(tmp_path, monkeypatch) -> None:
         "browser_features_configured",
     }
     assert response["status"] == "ok"
-    assert response["version"] == "1.8.0-alpha.1"
+    assert response["version"] == "1.9.0-alpha.1"
     assert response["bot_configured"] is False
     assert response["cookie_import_enabled"] is False
 
@@ -56,11 +56,43 @@ def test_admin_status_helper(tmp_path) -> None:
 
     status = build_admin_status(settings, store)
 
-    assert status.version == "1.8.0-alpha.1"
+    assert status.version == "1.9.0-alpha.1"
     assert status.active_jobs == 1
     assert status.known_jobs == 2
+    assert status.recent_completed_jobs >= 0
     assert status.runtime_allowed_users == 1
     assert status.storage_free_bytes > 0
     assert status.cookie_import_enabled is False
+    assert status.downloads_dir == str(downloads_dir)
+    assert status.search_provider == "duckduckgo_html"
+    assert status.download_mode == "safe"
     assert status.generated_directories["html"] is True
     assert status.generated_directories["pdf"] is False
+
+
+def test_health_live_response_shape() -> None:
+    response = asyncio.run(routes.health_live())
+
+    assert response == {"status": "ok", "version": "1.9.0-alpha.1"}
+
+
+def test_health_ready_success(tmp_path) -> None:
+    settings = make_settings(tmp_path, min_free_disk_mb=0)
+
+    response = readiness_payload(settings)
+
+    assert response["status"] in {"ok", "degraded"}
+    checks = response["checks"]
+    assert checks["downloads_writable"] is True
+    assert checks["persistent_store_dirs_writable"] is True
+    assert checks["search_provider_valid"] is True
+    assert checks["disk_free_above_minimum"] is True
+
+
+def test_health_ready_failure_for_invalid_search_provider(tmp_path) -> None:
+    settings = make_settings(tmp_path, search_provider="bad_provider")
+
+    response = readiness_payload(settings)
+
+    assert response["status"] == "degraded"
+    assert response["checks"]["search_provider_valid"] is False

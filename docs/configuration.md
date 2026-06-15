@@ -13,7 +13,7 @@ Configuration is loaded from environment variables and `.env`. Defaults below ma
 | `ENABLE_RUNTIME_ACCESS_MANAGEMENT` | `true` | Enables `/allow`, `/deny`, and `/allowed_users`. |
 | `REGISTER_BOT_COMMANDS` | `true` | Registers Telegram native command menus at startup. |
 | `FORCE_PERSIAN_COMMAND_MENU` | `false` | Uses Persian descriptions for the no-language default command menu. |
-| `COMMAND_MENU_LANGUAGE_MODE` | `auto` | Native menu mode: `auto`, `force_fa`, or `force_en`. |
+| `COMMAND_MENU_LANGUAGE_MODE` | `auto` | Native menu mode: `auto`, `force_fa`, `force_en`, or `minimal`. |
 | `RESET_TELEGRAM_COMMANDS_ON_START` | `false` | Deletes old default and Persian command lists before registration. |
 
 Admins always have protected-command access. Static and runtime allowlists are combined. If both are empty, only admins can use protected commands.
@@ -48,6 +48,10 @@ Telegram chooses localized native command descriptions using the Telegram client
 | `MAX_DOWNLOAD_SIZE_MB` | `50` | Maximum direct download size. |
 | `TELEGRAM_MAX_UPLOAD_SIZE_MB` | `50` | Local Telegram upload threshold. |
 | `MAX_DOWNLOADS_PER_USER_PER_DAY` | `10` | In-memory per-user daily direct-download quota. |
+| `MAX_ACTIONS_PER_USER_PER_MINUTE` | `20` | In-memory protected-action rate limit. |
+| `MAX_SEARCHES_PER_USER_PER_HOUR` | `30` | In-memory search rate limit. |
+| `MAX_BROWSER_ACTIONS_PER_USER_PER_HOUR` | `60` | In-memory browser job rate limit. |
+| `ADMIN_RATE_LIMIT_MULTIPLIER` | `5` | Multiplier applied to admin rate limits. |
 | `DOWNLOAD_MODE` | `safe` | `safe`, `confirm_unknown`, or `admin_override`. |
 | `ENABLE_DOWNLOAD_DISCOVERY` | `true` | Enables Find downloads on browser tabs. |
 | `DOWNLOAD_DISCOVERY_MAX_LINKS` | `10` | Maximum candidates shown per page. |
@@ -85,11 +89,14 @@ See [Web Search](search.md) for provider limitations.
 | `SEARCH_SESSION_MAX_STORED` | `300` | Maximum stored search sessions. |
 | `JOB_HISTORY_PATH` | `downloads/jobs/job_history.json` | Completed-job summaries. |
 | `JOB_HISTORY_MAX_STORED` | `1000` | Maximum completed summaries. |
+| `JOB_RESULT_KEEP_HOURS` | `24` | Completed-job retention shown by `/jobs`. |
 | `USER_PREFERENCES_PATH` | `downloads/preferences/user_preferences.json` | Persistent user language preferences. |
 | `BOT_TEXTS_PATH` | `downloads/texts/bot_texts.json` | Admin-editable bot text overrides. |
 | `BOT_TEXT_MAX_LENGTH` | `3000` | Maximum editable text length. |
 
 Active jobs remain in memory. Only safe completed-job summaries are persisted, using URL domains instead of full URLs.
+
+Rate limits are in-memory guardrails. They reset on restart and are intended to reduce accidental abuse during alpha/beta testing, not to replace a future shared limiter.
 
 ## Content Policy
 
