@@ -60,7 +60,7 @@ Examples:
 /pdf https://example.com
 ```
 
-Persian: یک نشانی عمومی مانند `https://example.com` بفرستید تا کارت عملیات نمایش داده شود.
+فارسی: یک نشانی عمومی مانند `https://example.com` بفرستید تا تب مرورگر باز شود.
 
 ## Admin Commands
 

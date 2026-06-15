@@ -75,7 +75,7 @@ from app.core.url_sessions import (
     url_session_store,
 )
 from app.core.url_validation import URLValidationError, validate_url
-from app.bot.i18n import bot_text, get_language, set_language, text
+from app.bot.i18n import TEXTS, bot_text, get_language, set_language, text
 from app.bot.commands import register_bot_commands
 from app.bot.ui import (
     detect_plain_url,
@@ -166,6 +166,16 @@ def consume_user_input(user_id: int) -> str | None:
 
 def policy_category_label(category: str, language: str) -> str:
     return text(f"policy_category_{category}", language)
+
+
+def policy_reason_label(reason: str, language: str) -> str:
+    key = f"policy_reason_{reason}"
+    return text(key, language) if key in TEXTS["en"] else reason
+
+
+def route_label(route: str, language: str) -> str:
+    key = f"route_{route}"
+    return text(key, language) if key in TEXTS["en"] else route
 
 
 def get_user_id(message: Message) -> int | None:
@@ -1345,7 +1355,7 @@ async def policy_test_handler(message: Message, command: CommandObject) -> None:
         "policy_test_result",
         language,
         decision=text("allowed" if decision.allowed else "blocked", language),
-        reason=decision.reason,
+        reason=policy_reason_label(decision.reason, language),
         category=(
             policy_category_label(decision.category, language)
             if decision.category
@@ -1373,12 +1383,14 @@ async def routes_handler(message: Message) -> None:
     language = get_language(admin_id)
     settings = get_settings()
     rules = load_route_rules(Path(settings.domain_route_rules_path))
-    rendered = "\n".join(f"{rule.domain}: {rule.route}" for rule in rules)
+    rendered = "\n".join(
+        f"{rule.domain}: {route_label(rule.route, language)}" for rule in rules
+    )
     await message.answer(text(
         "routes_status",
         language,
-        profile=settings.routing_profile,
-        rules=rendered or text("none", language),
+        profile=route_label(settings.routing_profile, language),
+        rules=rendered or text("route_no_rules", language),
     ))
 
 
@@ -1398,7 +1410,9 @@ async def route_domain_handler(message: Message, command: CommandObject) -> None
     except ValueError as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
         return
-    await message.answer(text("route_rule_set", language, domain=domain, route=parts[1]))
+    await message.answer(text(
+        "route_rule_set", language, domain=domain, route=route_label(parts[1], language)
+    ))
 
 
 @router.message(Command("unroute_domain"))
@@ -1442,7 +1456,9 @@ async def route_test_handler(message: Message, command: CommandObject) -> None:
     except (CommandArgumentError, URLValidationError, ValueError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
         return
-    await message.answer(text("route_test_result", language, domain=domain, route=route))
+    await message.answer(text(
+        "route_test_result", language, domain=domain, route=route_label(route, language)
+    ))
 
 
 @router.message(Command("cookies_help"))

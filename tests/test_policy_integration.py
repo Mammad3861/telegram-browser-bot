@@ -136,3 +136,15 @@ def test_policy_category_command_parser_lists_supported_categories() -> None:
     assert "adult" in message
     assert "crypto" in message
     assert "custom" in message
+
+
+def test_persian_policy_reason_hides_internal_code() -> None:
+    label = handlers.policy_reason_label("default_allow", "fa")
+
+    assert label == "مجاز طبق پیش‌فرض"
+    assert "default_allow" not in label
+
+
+def test_persian_route_labels_are_human_readable() -> None:
+    assert handlers.route_label("default", "fa") == "مسیر مستقیم"
+    assert handlers.route_label("proxy", "fa") == "مسیر پراکسی"

@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 def build_default_commands(language: str = "en") -> list[BotCommand]:
     descriptions = (
         {
-            "start": "شروع ربات",
-            "menu": "باز کردن منوی اصلی",
-            "help": "نمایش راهنما",
+            "start": "شروع بات",
+            "menu": "باز کردن منو",
+            "help": "راهنما",
             "language": "تغییر زبان",
             "sessions": "مدیریت نشست‌ها",
-            "whoami": "نمایش شناسه تلگرام شما",
+            "whoami": "نمایش شناسه تلگرام",
         }
         if language == "fa"
         else {
@@ -38,14 +38,14 @@ def build_default_commands(language: str = "en") -> list[BotCommand]:
 def build_admin_commands(language: str = "en") -> list[BotCommand]:
     descriptions = (
         {
-            "admin_status": "نمایش وضعیت اجرا",
-            "allowed_users": "نمایش کاربران مجاز",
-            "cleanup": "حذف فایل‌های قدیمی",
-            "purge_history": "حذف تاریخچه کارها",
-            "texts": "مدیریت متن‌های ربات",
-            "policy": "نمایش سیاست محتوا",
-            "routes": "نمایش مسیرهای خروجی",
-            "refresh_commands": "تازه‌سازی منوی دستورات",
+            "admin_status": "وضعیت اجرای بات",
+            "allowed_users": "کاربران مجاز",
+            "cleanup": "پاک‌سازی فایل‌های قدیمی",
+            "purge_history": "پاک‌سازی تاریخچه کارها",
+            "texts": "مدیریت متن‌های بات",
+            "policy": "سیاست محتوا",
+            "routes": "مسیرهای خروجی",
+            "refresh_commands": "تازه‌سازی منوی دستورها",
         }
         if language == "fa"
         else {

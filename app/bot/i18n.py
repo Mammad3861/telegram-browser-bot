@@ -237,11 +237,23 @@ TEXTS: dict[str, dict[str, str]] = {
         "policy_usage_test": "Usage: /policy_test <url>",
         "allowed": "allowed",
         "blocked": "blocked",
+        "policy_reason_default_allow": "allowed by default",
+        "policy_reason_default_block": "blocked by default",
+        "policy_reason_blocked_category": "blocked by category",
+        "policy_reason_allowed_category": "allowed by category",
+        "policy_reason_blocked_domain": "blocked by domain rule",
+        "policy_reason_explicitly_allowed": "allowed by domain rule",
+        "policy_reason_policy_disabled": "content policy is disabled",
+        "policy_reason_blocked_keyword": "blocked by keyword",
+        "policy_reason_allowed_keyword": "allowed by keyword",
         "routes_status": "Routing profile: {profile}\nRules:\n{rules}",
         "route_rule_set": "Route for {domain} set to {route}.",
         "route_rule_removed": "Route rule removed for {domain}.",
         "route_rule_missing": "Route rule was not found for {domain}.",
         "route_test_result": "Route for {domain}: {route}",
+        "route_default": "default",
+        "route_proxy": "proxy",
+        "route_no_rules": "No rules are configured.",
         "route_usage": "Usage: /route_domain <domain> <default|proxy>",
         "unroute_usage": "Usage: /unroute_domain <domain>",
         "route_test_usage": "Usage: /route_test <url>",
@@ -267,16 +279,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "menu_sessions": "نشست‌ها",
         "menu_account": "حساب",
         "menu_help": "راهنما",
-        "menu_search": "جست‌وجوی وب",
+        "menu_search": "جست‌وجو",
         "menu_new_url": "تب جدید / نشانی جدید",
         "menu_recent_jobs": "کارهای اخیر",
         "menu_language": "زبان",
         "help": (
-            "یک نشانی بفرستید تا کارت عملیات ساخته شود، از /menu استفاده کنید، زبان را با /language تغییر دهید، یا با /search جست‌وجو کنید.\n"
-            "دستورهای پیشرفته مانند /fetch، /links، /html، /screenshot و /pdf همچنان فعال هستند."
+            "یک نشانی بفرستید یا از /menu جست‌وجو را شروع کنید. زبان را هم می‌توانید با /language تغییر دهید.\n"
+            "دستورهای پیشرفته مثل /fetch، /links، /html، /screenshot و /pdf همچنان در دسترس‌اند."
         ),
-        "open_url": "یک نشانی http/https بفرستید تا کارت عملیات ساخته شود.",
-        "sessions": "نشستی ذخیره نشده است. برای افزودن نشست از /cookies_import استفاده کنید.",
+        "open_url": "یک نشانی http/https بفرستید تا تب مرورگر باز شود.",
+        "sessions": "نشستی ذخیره نشده است. برای افزودن نشست، از /cookies_import استفاده کنید.",
         "sessions_list": "نشست‌های ذخیره‌شده:\n{sessions}",
         "account": (
             "شناسه تلگرام: {user_id}\nمدیر: {admin}\nدسترسی: {access}\n"
@@ -285,11 +297,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "yes": "بله",
         "no": "خیر",
         "about": (
-            "ربات مرورگر تلگرام\nنسخه: {version}\n"
-            "ابزار تعاملی خروجی وب و مرورگر برای تلگرام.\n"
-            "محیط رسمی: {runtime_target}"
+            "مرورگر تلگرامی\nنسخه: {version}\n"
+            "مرور و دریافت خروجی از صفحه‌های وب در تلگرام.\n"
+            "محیط اجرای رسمی: {runtime_target}"
         ),
-        "search_help": "برای جست‌وجوی وب از /search عبارت موردنظر استفاده کنید.",
+        "search_help": "برای جست‌وجو بنویسید: /search عبارت موردنظر",
         "search_usage": "روش استفاده: /search عبارت جست‌وجو",
         "search_query_too_long": "عبارت جست‌وجو باید حداکثر {max_length} نویسه باشد.",
         "search_unavailable": (
@@ -297,28 +309,28 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
         "search_disabled": "جست‌وجوی وب غیرفعال است. همچنان می‌توانید یک نشانی مستقیم بفرستید.",
         "search_misconfigured": (
-            "جست‌وجو درست پیکربندی نشده است. با مالک ربات تماس بگیرید یا یک نشانی مستقیم بفرستید."
+            "جست‌وجو درست تنظیم نشده است. با مدیر بات تماس بگیرید یا یک نشانی مستقیم بفرستید."
         ),
         "search_no_results": (
-            "نتیجه امنی پیدا نشد. عبارت دیگری امتحان کنید یا یک نشانی مستقیم بفرستید."
+            "نتیجه‌ای پیدا نشد. عبارت دیگری را امتحان کنید یا یک نشانی مستقیم بفرستید."
         ),
         "search_source": "منبع: {provider}",
-        "search_partial_results": "{count} نتیجه از حداکثر {requested} نتیجه درخواستی نمایش داده می‌شود.",
-        "search_results": "🔎 نتایج برای: {query}",
+        "search_partial_results": "از {requested} نتیجه درخواستی، {count} نتیجه نمایش داده شد.",
+        "search_results": "🔎 نتایج جست‌وجو برای: {query}",
         "search_expired": "نشست جست‌وجو منقضی شده است. دوباره جست‌وجو کنید.",
         "search_not_owned": "این نشست جست‌وجو متعلق به کاربر دیگری است.",
-        "search_opening": "در حال باز کردن نتیجه...",
+        "search_opening": "در حال باز کردن نتیجه…",
         "search_closed": "نتایج جست‌وجو بسته شد.",
         "search_again_button": "جست‌وجوی دوباره",
         "close_button": "بستن",
-        "url_card": "تب مرورگر\n{title}\n{url}\n\nیک عملیات را انتخاب کنید:",
-        "url_refreshed": "کارت عملیات تازه‌سازی شد.\n\n{url}\n\nیک عملیات را انتخاب کنید:",
+        "url_card": "تب مرورگر\n{title}\n{url}\n\nچه کاری انجام شود؟",
+        "url_refreshed": "تب تازه‌سازی شد.\n\n{url}\n\nچه کاری انجام شود؟",
         "url_cancelled": "نشست این نشانی لغو شد.",
-        "url_screenshot_button": "تصویر",
+        "url_screenshot_button": "تصویر صفحه",
         "url_pdf_button": "PDF",
         "url_html_button": "HTML",
         "url_rendered_html_button": "HTML رندرشده",
-        "url_links_button": "پیوندها",
+        "url_links_button": "لینک‌ها",
         "url_download_button": "دانلود",
         "url_refresh_button": "تازه‌سازی",
         "url_cancel_button": "لغو",
@@ -327,17 +339,17 @@ TEXTS: dict[str, dict[str, str]] = {
         "search_input_prompt": "عبارت جست‌وجو را بفرستید.",
         "url_input_prompt": "یک نشانی عمومی http/https بفرستید.",
         "interaction_choose": "یک گزینه را انتخاب کنید:",
-        "interaction_none": "گزینه تعاملی امن و قابل مشاهده‌ای پیدا نشد.",
-        "interaction_failed": "تعامل با صفحه ناموفق بود. عملیات دیگری را امتحان کنید.",
-        "direct_file_only": "این نسخه فقط از پیوند مستقیم فایل پشتیبانی می‌کند.",
+        "interaction_none": "گزینه قابل‌مشاهده‌ای برای تعامل پیدا نشد.",
+        "interaction_failed": "تعامل با صفحه انجام نشد. گزینه دیگری را امتحان کنید.",
+        "direct_file_only": "فقط لینک مستقیم فایل پشتیبانی می‌شود.",
         "interaction_expired": "فهرست تعامل منقضی شده است. دوباره تعامل را باز کنید.",
         "tab_back_unavailable": "صفحه قبلی در این تب وجود ندارد.",
-        "commands_refresh_success": "منوی دستورات تلگرام تازه‌سازی شد. کش تلگرام ممکن است نمایش تغییرات را به تأخیر بیندازد.",
-        "commands_refresh_failed": "تازه‌سازی منوی دستورات تلگرام ناموفق بود.",
+        "commands_refresh_success": "منوی دستورهای تلگرام تازه‌سازی شد. ممکن است تلگرام تغییرات را با کمی تأخیر نشان دهد.",
+        "commands_refresh_failed": "منوی دستورهای تلگرام تازه‌سازی نشد.",
         "session_expired": "نشست این نشانی منقضی شده است. لطفاً نشانی را دوباره بفرستید.",
         "session_not_owned": "این نشست متعلق به کاربر دیگری است.",
-        "access_denied": "دسترسی رد شد. از مالک ربات درخواست دسترسی کنید.",
-        "invalid_url": "لطفاً فقط یک نشانی معتبر و عمومی http/https بفرستید.",
+        "access_denied": "دسترسی ندارید. از مدیر بات درخواست دسترسی کنید.",
+        "invalid_url": "لینک معتبر نیست. فقط یک نشانی عمومی http/https بفرستید.",
         "language_current": "زبان فعلی: {language}\nگزینه‌ها: en, fa",
         "language_updated": "زبان به {language} تغییر کرد.",
         "language_usage": "روش استفاده: /language en یا /language fa",
@@ -353,8 +365,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "job_status_running": "در حال اجرا",
         "job_status_success": "موفق",
         "job_status_failed": "ناموفق",
-        "job_status_cancelled": "لغوشده",
-        "job_failed": "کار {job_id} ناموفق بود: {error}",
+        "job_status_cancelled": "لغو شده",
+        "job_failed": "کار {job_id} انجام نشد: {error}",
         "job_not_found": "کار پیدا نشد.",
         "no_jobs": "کاری پیدا نشد.",
         "job_cancelled": "کار {job_id} لغو شد.",
@@ -363,49 +375,49 @@ TEXTS: dict[str, dict[str, str]] = {
         "cancel_usage": "روش استفاده: /cancel <job_id>",
         "url_usage": "روش استفاده: /{command} https://example.com",
         "daily_quota_exceeded": "سهمیه روزانه دانلود تمام شده است. فردا دوباره تلاش کنید.",
-        "no_links": "پیوندی پیدا نشد.",
-        "request_failed": "درخواست ناموفق بود: {error}",
-        "admin_required": "دسترسی مدیر لازم است.",
+        "no_links": "لینکی پیدا نشد.",
+        "request_failed": "درخواست انجام نشد: {error}",
+        "admin_required": "این بخش فقط برای مدیران است.",
         "whoami": "شناسه تلگرام شما: {user_id}",
         "user_id_unavailable": "شناسه کاربر در دسترس نیست.",
         "access_status": (
             "شناسه تلگرام شما: {user_id}\nمدیر: {admin}\n"
-            "مدیریت دسترسی زمان اجرا: {runtime_state}\n"
-            "کاربران مجاز ثابت: {static_count}\nکاربران مجاز زمان اجرا: {runtime_count}"
+            "مدیریت دسترسی پویا: {runtime_state}\n"
+            "کاربران مجاز ثابت: {static_count}\nکاربران مجاز پویا: {runtime_count}"
         ),
         "enabled": "فعال",
         "disabled": "غیرفعال",
-        "runtime_access_disabled": "مدیریت دسترسی زمان اجرا غیرفعال است.",
+        "runtime_access_disabled": "مدیریت دسترسی پویا غیرفعال است.",
         "access_target_required": "شناسه تلگرام لازم است.",
         "access_target_invalid": "شناسه تلگرام باید عدد صحیح باشد.",
         "access_granted": "دسترسی به کاربر {user_id} داده شد.",
         "access_already_allowed": "کاربر {user_id} از قبل در فهرست مجاز است.",
-        "access_revoked": "دسترسی زمان اجرای کاربر {user_id} لغو شد.",
-        "access_user_not_found": "کاربر مجاز زمان اجرا پیدا نشد.",
+        "access_revoked": "دسترسی کاربر {user_id} لغو شد.",
+        "access_user_not_found": "کاربر در فهرست دسترسی پیدا نشد.",
         "admin_cannot_be_denied": "نمی‌توان دسترسی مدیران را لغو کرد.",
         "allowed_users_list": (
-            "کاربران مجاز ثابت: {static_users}\nکاربران مجاز زمان اجرا:\n{runtime_users}"
+            "کاربران مجاز ثابت: {static_users}\nکاربران مجاز پویا:\n{runtime_users}"
         ),
         "none": "هیچ‌کدام",
-        "cleanup_failed": "پاک‌سازی ناموفق بود و فایل‌های تولیدشده حذف نشدند.",
-        "cleanup_summary": "پاک‌سازی کامل شد.\nفایل‌های حذف‌شده: {count}\nفضای آزادشده: {bytes} بایت",
+        "cleanup_failed": "پاک‌سازی انجام نشد؛ فایل‌های تولیدشده حذف نشدند.",
+        "cleanup_summary": "پاک‌سازی انجام شد.\nفایل‌های حذف‌شده: {count}\nفضای آزادشده: {bytes} بایت",
         "purge_history_failed": "تاریخچه کارها پاک نشد.",
         "purge_history_summary": "تاریخچه کارها پاک شد. ورودی‌های حذف‌شده: {count}",
         "invalid_action": "عملیات نامعتبر است.",
         "admin_status": (
             "نسخه: {version}\nمحیط اجرا: {runtime_target}\nکارهای فعال: {active_jobs}\n"
-            "کارهای شناخته‌شده: {known_jobs}\nکاربران مجاز زمان اجرا: {runtime_users}\n"
+            "کارهای ثبت‌شده: {known_jobs}\nکاربران مجاز پویا: {runtime_users}\n"
             "فضای آزاد: {free_bytes} بایت\nورود کوکی: {cookie_state}\n"
             "پوشه‌های خروجی: {directories}"
         ),
         "ready": "آماده",
         "missing": "ناموجود",
         "cookies_help": (
-            "از /cookies_import <domain> استفاده کنید و سپس فهرست JSON سازگار با Playwright را بفرستید. "
+            "ابتدا /cookies_import <domain> را بفرستید، سپس فهرست JSON سازگار با Playwright را ارسال کنید. "
             "هر کوکی باید name، value و domain داشته باشد. مقدار کوکی‌ها نمایش داده نمی‌شود."
         ),
-        "cookie_import_disabled": "ورود کوکی غیرفعال است.",
-        "cookie_key_missing": "کلید رمزنگاری کوکی تنظیم نشده است. از مالک ربات بخواهید آن را تنظیم کند.",
+        "cookie_import_disabled": "واردکردن کوکی غیرفعال است.",
+        "cookie_key_missing": "کلید رمزنگاری کوکی تنظیم نشده است. از مدیر بات بخواهید آن را تنظیم کند.",
         "cookies_import_usage": "روش استفاده: /cookies_import <domain>",
         "user_identification_failed": "شناسایی کاربر درخواست‌کننده ممکن نشد.",
         "cookies_send_json": "فهرست JSON کوکی‌های دامنه {domain} را در پیام بعدی بفرستید.",
@@ -420,41 +432,41 @@ TEXTS: dict[str, dict[str, str]] = {
         "final_url_label": "نشانی نهایی",
         "compressed_label": "فشرده‌شده",
         "sha256_label": "SHA256",
-        "html_sent": "HTML ذخیره و ارسال شد: {filename}",
-        "rendered_html_sent": "HTML رندرشده صادر و ارسال شد: {filename}",
+        "html_sent": "فایل HTML آماده و ارسال شد: {filename}",
+        "rendered_html_sent": "HTML رندرشده آماده و ارسال شد: {filename}",
         "download_sent": "فایل دانلود و ارسال شد: {filename}",
         "screenshot_sent": "تصویر صفحه گرفته و ارسال شد: {filename}",
-        "pdf_sent": "PDF صادر و ارسال شد: {filename}",
+        "pdf_sent": "PDF ساخته و ارسال شد: {filename}",
         "upload_limit_exceeded": "فایل محلی ذخیره شد اما از محدودیت ارسال تلگرام بزرگ‌تر است.",
-        "upload_limit_result": "فایل محلی ذخیره شد؛ محدودیت ارسال تلگرام رد شد.",
+        "upload_limit_result": "فایل روی سرور ذخیره شد، اما برای ارسال در تلگرام بیش از حد بزرگ است.",
         "telegram_upload_failed": "تلگرام فایل را نپذیرفت. فایل به‌صورت محلی باقی مانده است.",
         "telegram_rendered_html_failed": "تلگرام نتوانست فایل HTML رندرشده را ارسال کند.",
         "telegram_screenshot_failed": "تلگرام نتوانست فایل تصویر را ارسال کند.",
         "telegram_pdf_failed": "تلگرام نتوانست فایل PDF را ارسال کند.",
-        "browser_request_failed": "درخواست مرورگر ناموفق بود.",
-        "job_unexpected_failure": "کار به‌طور غیرمنتظره ناموفق بود.",
-        "content_policy_blocked": "این سایت طبق سیاست محتوایی بات مسدود شده است.",
+        "browser_request_failed": "مرورگر نتوانست صفحه را باز کند.",
+        "job_unexpected_failure": "کار به‌دلیل یک خطای پیش‌بینی‌نشده انجام نشد.",
+        "content_policy_blocked": "این سایت طبق سیاست محتوای بات مسدود شده است.",
         "protected_media_download": "دانلود مستقیم از پلتفرم‌های استریم یا محتوای محافظت‌شده پشتیبانی نمی‌شود.",
         "media_site_note": (
-            "برخی سایت‌های رسانه‌ای ممکن است داخل بات کامل کار نکنند. عملیات مرورگر به "
-            "پیش‌نمایش و خروجی امن محدود است."
+            "ممکن است برخی سایت‌های رسانه‌ای داخل بات کامل کار نکنند. امکانات مرورگر به "
+            "پیش‌نمایش و خروجی‌های امن محدود است."
         ),
         "proxy_not_configured": "مسیر پراکسی تنظیم نشده است.",
         "policy_status": (
-            "سیاست محتوا: {state}\nعمل پیش‌فرض: {default_action}\n"
-            "فیلتر ایمنی داخلی: {builtin_state}\n"
-            "دامنه‌های مسدود: {blocked}\nدامنه‌های مجاز: {allowed}\n"
+            "سیاست محتوا: {state}\nرفتار پیش‌فرض: {default_action}\n"
+            "فهرست داخلی دسته‌بندی: {builtin_state}\n"
+            "دامنه‌های مسدود دستی: {blocked}\nدامنه‌های مجاز دستی: {allowed}\n"
             "دسته‌های مسدود: {categories}\nدسته‌های مجاز: {allowed_categories}\n"
             "دسته‌های قابل تنظیم: {configurable_categories}\nآخرین تغییر: {updated_at}"
         ),
-        "policy_domain_added": "قانون سیاست برای {domain} افزوده شد.",
-        "policy_domain_exists": "قانون سیاست برای {domain} از قبل وجود دارد.",
-        "policy_domain_removed": "قانون سیاست برای {domain} حذف شد.",
-        "policy_domain_missing": "قانون سیاست برای {domain} پیدا نشد.",
-        "policy_test_result": "آزمایش سیاست: {decision}\nدلیل: {reason}\nدسته: {category}",
-        "policy_reloaded": "سیاست محتوا دوباره بارگذاری شد. دامنه‌های مسدود: {count}.",
+        "policy_domain_added": "قانون دامنه {domain} ثبت شد.",
+        "policy_domain_exists": "قانون دامنه {domain} از قبل ثبت شده است.",
+        "policy_domain_removed": "قانون دامنه {domain} حذف شد.",
+        "policy_domain_missing": "قانونی برای دامنه {domain} پیدا نشد.",
+        "policy_test_result": "نتیجه بررسی سیاست: {decision}\nدلیل: {reason}\nدسته: {category}",
+        "policy_reloaded": "سیاست محتوا دوباره بارگذاری شد. دامنه‌های مسدود دستی: {count}.",
         "policy_usage_block": "روش استفاده: /block_domain <domain> [category]",
-        "policy_invalid_category": "دسته نامعتبر است. یکی از این موارد را انتخاب کنید: {categories}.",
+        "policy_invalid_category": "دسته نامعتبر است. دسته‌های معتبر: {categories}",
         "policy_category_adult": "بزرگسالان",
         "policy_category_gambling": "قمار",
         "policy_category_crypto": "کریپتو",
@@ -465,15 +477,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "policy_category_custom": "سفارشی",
         "policy_state_blocked": "مسدود",
         "policy_state_allowed": "مجاز",
-        "policy_state_neutral": "خنثی",
+        "policy_state_neutral": "بدون محدودیت",
         "policy_categories_title": "سیاست دسته‌ها:\n{categories}",
         "policy_category_line": "{category}: {state}",
-        "policy_category_rule_updated": "وضعیت {category} به {state} تغییر کرد.",
-        "policy_category_rule_unchanged": "وضعیت {category} از قبل {state} بود.",
+        "policy_category_rule_updated": "دسته {category} اکنون {state} است.",
+        "policy_category_rule_unchanged": "دسته {category} از قبل {state} است.",
         "policy_category_usage": "روش استفاده: /{command} <category>",
         "policy_category_domain_usage": "روش استفاده: /{command} <category> <domain>",
-        "policy_category_domains": "دامنه‌های دسته‌بندی‌شده به‌عنوان {category}:\n{domains}",
-        "policy_invalid_category_or_domain": "دسته یا دامنه نامعتبر است. دسته‌های مجاز: {categories}.",
+        "policy_category_domains": "دامنه‌های دسته {category}:\n{domains}",
+        "policy_invalid_category_or_domain": "دسته یا دامنه نامعتبر است. دسته‌های معتبر: {categories}",
         "policy_category_domain_added": "دامنه {domain} به دسته {category} افزوده شد.",
         "policy_category_domain_exists": "دامنه {domain} از قبل در دسته {category} وجود دارد.",
         "policy_category_domain_removed": "دامنه {domain} از دسته {category} حذف شد.",
@@ -482,25 +494,39 @@ TEXTS: dict[str, dict[str, str]] = {
         "policy_usage_test": "روش استفاده: /policy_test <url>",
         "allowed": "مجاز",
         "blocked": "مسدود",
-        "routes_status": "پروفایل مسیریابی: {profile}\nقوانین:\n{rules}",
-        "route_rule_set": "مسیر {domain} روی {route} تنظیم شد.",
+        "policy_reason_default_allow": "مجاز طبق پیش‌فرض",
+        "policy_reason_default_block": "مسدود طبق پیش‌فرض",
+        "policy_reason_blocked_category": "مسدود به‌دلیل دسته",
+        "policy_reason_allowed_category": "مجاز به‌دلیل دسته مجاز",
+        "policy_reason_blocked_domain": "مسدود به‌دلیل دامنه",
+        "policy_reason_explicitly_allowed": "مجاز به‌دلیل دامنه مجاز",
+        "policy_reason_policy_disabled": "سیاست محتوا غیرفعال است",
+        "policy_reason_blocked_keyword": "مسدود به‌دلیل عبارت ممنوع",
+        "policy_reason_allowed_keyword": "مجاز به‌دلیل عبارت مجاز",
+        "routes_status": "پروفایل مسیریابی: {profile}\nقانون‌ها:\n{rules}",
+        "route_rule_set": "مسیر دامنه {domain} روی {route} تنظیم شد.",
         "route_rule_removed": "قانون مسیر {domain} حذف شد.",
-        "route_rule_missing": "قانون مسیر {domain} پیدا نشد.",
-        "route_test_result": "مسیر {domain}: {route}",
+        "route_rule_missing": "قانونی برای مسیر دامنه {domain} پیدا نشد.",
+        "route_test_result": "مسیر دامنه {domain}: {route}",
+        "route_default": "مسیر مستقیم",
+        "route_proxy": "مسیر پراکسی",
+        "route_no_rules": "قانونی ثبت نشده است.",
         "route_usage": "روش استفاده: /route_domain <domain> <default|proxy>",
         "unroute_usage": "روش استفاده: /unroute_domain <domain>",
         "route_test_usage": "روش استفاده: /route_test <url>",
         "texts_overview": (
-            "کلیدهای متن قابل ویرایش: welcome, help, about\nزبان‌ها: en, fa\n"
-            "از /set_text، /reset_text و /preview_text استفاده کنید."
+            "متن‌های قابل ویرایش:\n"
+            "- welcome — پیام خوش‌آمد\n- help — راهنما\n- about — درباره بات\n\n"
+            "زبان‌ها:\n- fa — فارسی\n- en — انگلیسی\n\n"
+            "برای تغییر متن از /set_text، برای بازنشانی از /reset_text و برای پیش‌نمایش از /preview_text استفاده کنید."
         ),
-        "text_updated": "متن {key}/{language} به‌روزرسانی شد.",
-        "text_reset": "متن {target} به مقدار پیش‌فرض بازنشانی شد.",
+        "text_updated": "متن {key}/{language} به‌روز شد.",
+        "text_reset": "متن {target} به حالت پیش‌فرض برگشت.",
         "text_override_missing": "برای {target} متن سفارشی پیدا نشد.",
         "text_preview": "پیش‌نمایش {key}/{language}:\n\n{preview}",
         "text_invalid_key": "کلید متن نامعتبر است. از welcome، help یا about استفاده کنید.",
         "text_invalid_language": "زبان نامعتبر است. از en یا fa استفاده کنید.",
-        "text_too_long": "متن بیش از حد طولانی است. حداکثر طول {max_length} نویسه است.",
+        "text_too_long": "متن خیلی طولانی است. حداکثر {max_length} نویسه مجاز است.",
         "text_empty": "متن نمی‌تواند خالی باشد.",
         "text_key_required": "کلید متن لازم است.",
         "set_text_usage": "روش استفاده: /set_text <key> <lang> <text>",

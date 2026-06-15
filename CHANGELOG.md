@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.7.2-alpha.1] - 2026-06-15
+
+### Improved
+
+- Reviewed and rewrote Persian user-facing copy across menus, browser tabs, search, jobs, access, cleanup, uploads, policy, routing, and admin text tools.
+- Replaced awkward literal terminology with consistent product language, including `بدون محدودیت` for neutral category state.
+- Localized policy decision reasons so internal values such as `default_allow` are never shown to Persian users.
+- Expanded Persian `/texts` output with human-readable labels for editable keys and languages.
+- Polished Persian Telegram native command descriptions and documentation examples.
+
+### Notes
+
+- No policy, routing, search, access, or browser behavior changed in this wording-only release.
+
 ## [v1.7.1-alpha.1] - 2026-06-15
 
 ### Added

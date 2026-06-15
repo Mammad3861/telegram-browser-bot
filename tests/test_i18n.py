@@ -108,3 +108,50 @@ def test_admin_text_translation_falls_back_to_english(monkeypatch) -> None:
     assert text("text_updated", "fa", key="help", language="fa") == (
         "Updated help/fa."
     )
+
+
+def test_persian_copy_avoids_awkward_policy_terms() -> None:
+    assert "خنثی" not in text("policy_state_neutral", "fa")
+    assert text("policy_state_neutral", "fa") == "بدون محدودیت"
+    assert "default_allow" not in text("policy_reason_default_allow", "fa")
+    assert "default_deny" not in text("policy_reason_default_block", "fa")
+
+
+def test_persian_policy_output_uses_natural_default_action() -> None:
+    output = text(
+        "policy_status",
+        "fa",
+        state=text("enabled", "fa"),
+        default_action=text("allowed", "fa"),
+        builtin_state=text("enabled", "fa"),
+        blocked=0,
+        allowed=0,
+        categories=text("none", "fa"),
+        allowed_categories=text("none", "fa"),
+        configurable_categories=text("policy_category_adult", "fa"),
+        updated_at="2026-06-15",
+    )
+
+    assert "رفتار پیش‌فرض: مجاز" in output
+    assert "default_allow" not in output
+    assert "default_deny" not in output
+    assert " allow" not in output
+    assert " deny" not in output
+
+
+def test_persian_texts_overview_has_human_readable_labels() -> None:
+    overview = text("texts_overview", "fa")
+
+    assert "welcome — پیام خوش‌آمد" in overview
+    assert "help — راهنما" in overview
+    assert "about — درباره بات" in overview
+    assert "fa — فارسی" in overview
+    assert "en — انگلیسی" in overview
+
+
+def test_preferred_persian_menu_and_action_terms() -> None:
+    assert text("menu_help", "fa") == "راهنما"
+    assert text("menu_language", "fa") == "زبان"
+    assert text("url_screenshot_button", "fa") == "تصویر صفحه"
+    assert text("url_links_button", "fa") == "لینک‌ها"
+    assert text("route_no_rules", "fa") == "قانونی ثبت نشده است."

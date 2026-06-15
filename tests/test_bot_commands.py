@@ -47,7 +47,7 @@ def test_persian_default_command_list_builder() -> None:
         "sessions",
         "whoami",
     ]
-    assert commands[1].description == "باز کردن منوی اصلی"
+    assert commands[1].description == "باز کردن منو"
 
 
 def test_admin_command_list_builder() -> None:
@@ -78,13 +78,13 @@ def test_persian_admin_command_list_builder() -> None:
         "routes",
         "refresh_commands",
     ]
-    assert commands[0].description == "نمایش وضعیت اجرا"
+    assert commands[0].description == "وضعیت اجرای بات"
 
 
 def test_persian_command_descriptions() -> None:
     commands = {command.command: command for command in build_default_commands("fa")}
 
-    assert commands["menu"].description == "باز کردن منوی اصلی"
+    assert commands["menu"].description == "باز کردن منو"
     assert commands["language"].description == "تغییر زبان"
     assert commands["sessions"].description == "مدیریت نشست‌ها"
 
@@ -116,13 +116,13 @@ def test_registration_includes_default_localized_and_admin_scopes() -> None:
     assert bot.calls[0].get("language_code") is None
     assert bot.calls[0]["commands"][1].description == "Open interactive menu"
     assert bot.calls[1]["language_code"] == "fa"
-    assert bot.calls[1]["commands"][1].description == "باز کردن منوی اصلی"
+    assert bot.calls[1]["commands"][1].description == "باز کردن منو"
     admin_calls = bot.calls[2:]
     assert {call["scope"].chat_id for call in admin_calls} == {123, 456}
     assert all(len(call["commands"]) == 14 for call in admin_calls)
     assert all(
         call["commands"][0].description == (
-            "شروع ربات" if call.get("language_code") == "fa" else "Start the bot"
+            "شروع بات" if call.get("language_code") == "fa" else "Start the bot"
         )
         for call in admin_calls
     )
@@ -140,7 +140,7 @@ def test_force_persian_command_menu_uses_persian_for_no_language_default() -> No
 
     assert result is True
     assert bot.calls[0].get("language_code") is None
-    assert bot.calls[0]["commands"][1].description == "باز کردن منوی اصلی"
+    assert bot.calls[0]["commands"][1].description == "باز کردن منو"
     assert bot.calls[1]["language_code"] == "fa"
 
 

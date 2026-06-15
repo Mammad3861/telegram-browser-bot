@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml)
 
-**Current version:** `v1.7.1-alpha.1`
+**Current version:** `v1.7.2-alpha.1`
 
 A Docker-first Telegram bot for safely fetching pages, searching the web, extracting links, downloading direct files, and exporting HTML, screenshots, and PDFs. The supported production target is Ubuntu 24.04 or Docker Compose.
 
