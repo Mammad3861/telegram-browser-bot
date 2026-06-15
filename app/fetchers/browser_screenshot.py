@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
+from typing import Any
 
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
@@ -52,6 +53,7 @@ class ScreenshotOptions:
     minimum_free_mb: int = 512
     cookies: tuple[dict, ...] = ()
     proxy_server: str | None = None
+    storage_state: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -121,6 +123,7 @@ async def capture_screenshot(
                         "width": options.viewport_width,
                         "height": options.viewport_height,
                     },
+                    options.storage_state,
                 )
                 page = await context.new_page()
 

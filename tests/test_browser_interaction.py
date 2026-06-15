@@ -1,4 +1,4 @@
-from app.fetchers.browser_interaction import normalize_elements
+from app.fetchers.browser_interaction import normalize_elements, option_label
 
 
 def test_interaction_element_extraction_normalizes_links() -> None:
@@ -22,3 +22,13 @@ def test_interaction_max_element_limit() -> None:
     ]
 
     assert len(normalize_elements(items, "https://example.com", 10)) == 10
+
+
+def test_page_option_label_includes_type_and_external_domain() -> None:
+    element = normalize_elements(
+        [{"label": "Continue", "kind": "link", "href": "https://other.example/next"}],
+        "https://example.com",
+        10,
+    )[0]
+
+    assert option_label(element, "https://example.com") == "Continue · link · other.example"

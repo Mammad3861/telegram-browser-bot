@@ -48,9 +48,9 @@ These require an administrator or allowed user.
 | `/sessions` | List saved cookie-session domains. |
 | `/delete_session <domain>` | Delete one saved cookie session. |
 
-You can also send a single public URL without a command to create a persistent browser tab card. Its buttons provide Back, Refresh, Links, Screenshot, PDF, HTML, Rendered HTML, direct Download, explicit Interact, and Close actions.
+You can also send a single public URL without a command to create a persistent browser tab card. Its buttons provide Back, Refresh, Links, Screenshot, PDF, HTML, Rendered HTML, direct Download, Page options, and Close actions.
 
-Interact lists up to the configured number of visible links and simple buttons. It never fills forms, submits passwords, or automatically passes age/consent gates; the user must choose an element explicitly.
+Page options lists up to the configured number of visible links and simple buttons. A selected option updates the tab URL/title and, when encryption is configured, saves browser storage for later tab actions. It may help with cookie consent and simple age-confirmation screens. It never fills forms, submits passwords, or automatically passes age/consent gates; the user must choose an option explicitly.
 
 Examples:
 

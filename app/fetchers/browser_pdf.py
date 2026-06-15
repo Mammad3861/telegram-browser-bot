@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
+from typing import Any
 
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
@@ -52,6 +53,7 @@ class PdfOptions:
     minimum_free_mb: int = 512
     cookies: tuple[dict, ...] = ()
     proxy_server: str | None = None
+    storage_state: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -110,7 +112,9 @@ async def export_pdf(url: str, output_dir: Path, options: PdfOptions) -> PdfResu
                 proxy={"server": options.proxy_server} if options.proxy_server else None,
             )
             try:
-                context = await create_isolated_context(browser, options.cookies)
+                context = await create_isolated_context(
+                    browser, options.cookies, storage_state=options.storage_state
+                )
                 page = await context.new_page()
 
                 async def validate_route(route) -> None:

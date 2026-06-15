@@ -127,3 +127,15 @@ def test_tab_navigation_and_back_history() -> None:
     assert previous is not None
     assert previous.current_url == "https://example.com"
     assert previous.history == ()
+
+
+def test_tab_navigation_persists_updated_url_and_title(tmp_path) -> None:
+    path = tmp_path / "url_sessions.json"
+    store = URLSessionStore(path)
+    session = store.create(123, "https://example.com", now=NOW)
+
+    store.navigate(session.session_id, 123, "https://example.com/home", "Home", now=NOW)
+    loaded = URLSessionStore(path).get_for_user(session.session_id, 123, 60, now=NOW)
+
+    assert loaded.current_url == "https://example.com/home"
+    assert loaded.title == "Home"

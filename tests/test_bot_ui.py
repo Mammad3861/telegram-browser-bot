@@ -5,6 +5,8 @@ from app.bot.handlers import (
     begin_user_input,
     consume_user_input,
     pending_user_inputs,
+    pending_interactions,
+    invalidate_page_options,
 )
 from app.bot.i18n import text
 from app.bot.ui import (
@@ -69,12 +71,12 @@ def test_about_text_contains_version_and_runtime_without_secrets() -> None:
     about = text(
         "about",
         "en",
-        version="1.7.2-alpha.1",
+        version="1.7.3-alpha.1",
         runtime_target="Linux/Ubuntu 24.04 or Docker",
     )
 
     assert "Telegram Browser Bot" in about
-    assert "1.7.2-alpha.1" in about
+    assert "1.7.3-alpha.1" in about
     assert "Linux/Ubuntu 24.04 or Docker" in about
     assert "TOKEN" not in about
 
@@ -114,6 +116,19 @@ def test_persian_url_action_button_labels() -> None:
         text("url_cancel_button", "fa"),
     ]
 
+
+def test_page_options_user_facing_labels() -> None:
+    assert text("url_interact_button", "en") == "Page options"
+    assert text("url_interact_button", "fa") == "گزینه‌های صفحه"
+    assert "تعامل" not in text("url_interact_button", "fa")
+
+
+def test_old_page_options_are_invalidated() -> None:
+    pending_interactions[(123, "abc12345")] = []
+
+    invalidate_page_options(123, "abc12345")
+
+    assert (123, "abc12345") not in pending_interactions
 
 @pytest.mark.parametrize("mode", ["search", "url"])
 def test_button_first_input_flow_state(mode: str) -> None:

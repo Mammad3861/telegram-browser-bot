@@ -34,8 +34,9 @@ Telegram chooses localized native command descriptions using the Telegram client
 | `PDF_FORMAT` | `A4` | Playwright PDF paper format. |
 | `PDF_PRINT_BACKGROUND` | `true` | Include backgrounds in PDFs. |
 | `RENDERED_HTML_WAIT_UNTIL` | `domcontentloaded` | Rendered HTML navigation load state. |
-| `INTERACTION_MAX_ELEMENTS` | `10` | Maximum visible links/buttons shown by Interact. |
+| `INTERACTION_MAX_ELEMENTS` | `10` | Maximum visible links/buttons shown by Page options. |
 | `INTERACTION_TIMEOUT_SECONDS` | `30` | Playwright timeout for page interaction. |
+| `BROWSER_TAB_STATE_DIR` | `downloads/browser_tabs` | Encrypted per-user browser-tab storage state. |
 
 ## Downloads And Storage
 

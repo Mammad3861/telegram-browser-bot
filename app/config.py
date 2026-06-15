@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     domain_route_rules_path: str = "downloads/policies/route_rules.json"
     interaction_max_elements: int = 10
     interaction_timeout_seconds: float = 30.0
+    browser_tab_state_dir: str = "downloads/browser_tabs"
     enable_builtin_safety_blocklist: bool = True
     builtin_adult_category_enabled: bool = True
     builtin_gambling_category_enabled: bool = True

@@ -1,14 +1,20 @@
 import asyncio
 import ipaddress
+import logging
 import socket
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urljoin, urlparse
 
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
 from app.core.content_policy import validate_configured_policy
 from app.core.url_validation import URLValidationError
 from app.fetchers.browser_context import create_isolated_context
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -17,6 +23,13 @@ class InteractiveElement:
     label: str
     kind: str
     href: str | None = None
+
+
+@dataclass(frozen=True)
+class InteractionResult:
+    final_url: str
+    title: str | None
+    storage_state: dict[str, Any] | None
 
 
 async def _validate_target(url: str) -> str:
@@ -53,12 +66,61 @@ def normalize_elements(items: list[dict], base_url: str, limit: int) -> list[Int
     return elements
 
 
+def option_label(element: InteractiveElement, current_url: str) -> str:
+    kind = "link" if element.kind == "link" else "button"
+    if element.href:
+        current_domain = urlparse(current_url).hostname
+        target_domain = urlparse(element.href).hostname
+        if target_domain and target_domain != current_domain:
+            return f"{element.label} · {kind} · {target_domain}"
+    return f"{element.label} · {kind}"
+
+
+async def extract_page_links(
+    url: str,
+    timeout_seconds: float,
+    cookies: tuple[dict, ...] = (),
+    proxy_server: str | None = None,
+    storage_state: dict[str, Any] | None = None,
+) -> list[str]:
+    await _validate_target(url)
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(
+            headless=True, proxy={"server": proxy_server} if proxy_server else None
+        )
+        try:
+            context = await create_isolated_context(
+                browser, cookies, storage_state=storage_state
+            )
+            page = await context.new_page()
+            await page.goto(
+                url, wait_until="domcontentloaded", timeout=int(timeout_seconds * 1000)
+            )
+            values = await page.locator("a[href]").evaluate_all(
+                "els => els.filter(e => e.offsetParent !== null).map(e => e.href)"
+            )
+            links: list[str] = []
+            for value in values:
+                if not isinstance(value, str) or value in links:
+                    continue
+                try:
+                    links.append(await _validate_target(value))
+                except (URLValidationError, ValueError, OSError):
+                    continue
+                if len(links) >= 50:
+                    break
+            return links
+        finally:
+            await browser.close()
+
+
 async def extract_interactive_elements(
     url: str,
     timeout_seconds: float,
     max_elements: int,
     cookies: tuple[dict, ...] = (),
     proxy_server: str | None = None,
+    storage_state: dict[str, Any] | None = None,
 ) -> list[InteractiveElement]:
     await _validate_target(url)
     async with async_playwright() as playwright:
@@ -66,11 +128,13 @@ async def extract_interactive_elements(
             headless=True, proxy={"server": proxy_server} if proxy_server else None
         )
         try:
-            context = await create_isolated_context(browser, cookies)
+            context = await create_isolated_context(
+                browser, cookies, storage_state=storage_state
+            )
             page = await context.new_page()
             await page.goto(url, wait_until="domcontentloaded", timeout=int(timeout_seconds * 1000))
             items = await page.locator(
-                "a[href], button, input[type=submit], [role=button]"
+                "a[href], button, input[type=submit], input[type=button], [role=button]"
             ).evaluate_all(
                 """els => els.map((e, index) => {
                   const s = getComputedStyle(e); const r = e.getBoundingClientRect();
@@ -93,26 +157,53 @@ async def activate_interactive_element(
     timeout_seconds: float,
     cookies: tuple[dict, ...] = (),
     proxy_server: str | None = None,
-) -> tuple[str, str | None]:
-    if element.kind == "link" and element.href:
-        return await _validate_target(element.href), None
+    storage_state: dict[str, Any] | None = None,
+) -> InteractionResult:
     await _validate_target(url)
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(
             headless=True, proxy={"server": proxy_server} if proxy_server else None
         )
         try:
-            context = await create_isolated_context(browser, cookies)
+            context = await create_isolated_context(
+                browser, cookies, storage_state=storage_state
+            )
             page = await context.new_page()
             await page.goto(url, wait_until="domcontentloaded", timeout=int(timeout_seconds * 1000))
             if await page.locator("input[type=password]").count():
                 raise PermissionError("Password form interaction is not supported")
-            locator = page.locator(
-                "a[href], button, input[type=submit], [role=button]"
-            ).nth(element.index)
-            await locator.click(timeout=int(timeout_seconds * 1000))
+            if element.kind == "link" and element.href:
+                await _validate_target(element.href)
+                await page.goto(
+                    element.href,
+                    wait_until="domcontentloaded",
+                    timeout=int(timeout_seconds * 1000),
+                )
+            else:
+                locator = page.locator(
+                    "a[href], button, input[type=submit], input[type=button], [role=button]"
+                ).nth(element.index)
+                await locator.click(timeout=int(timeout_seconds * 1000))
+                try:
+                    await page.wait_for_load_state(
+                        "domcontentloaded", timeout=min(int(timeout_seconds * 1000), 5000)
+                    )
+                except PlaywrightTimeoutError:
+                    pass
             await page.wait_for_timeout(500)
             final_url = await _validate_target(page.url)
-            return final_url, await page.title()
+            try:
+                saved_state = await context.storage_state()
+            except Exception as exc:
+                logger.warning(
+                    "Browser storage state capture failed: exception_type=%s",
+                    type(exc).__name__,
+                )
+                saved_state = None
+            return InteractionResult(
+                final_url=final_url,
+                title=await page.title() or None,
+                storage_state=saved_state,
+            )
         finally:
             await browser.close()

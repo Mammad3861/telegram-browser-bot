@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.7.3-alpha.1] - 2026-06-15
+
+### Fixed
+
+- Renamed the user-facing Interact action to Page options / گزینه‌های صفحه.
+- Page-option clicks now capture and persist the resulting URL and page title.
+- Encrypted Playwright storage state is saved per user/tab and reused by later Page options, Links, Screenshot, PDF, and Rendered HTML actions.
+- Old option lists are invalidated after a successful click and replaced with an updated tab card.
+- Added friendly diagnostics when the page updates but encrypted state cannot be saved.
+
+### Safety
+
+- Page options remain user-initiated and limited to visible links and simple buttons.
+- No form autofill, password storage, CAPTCHA/DRM/paywall bypass, or automatic age/consent confirmation was added.
+
 ## [v1.7.2-alpha.1] - 2026-06-15
 
 ### Improved

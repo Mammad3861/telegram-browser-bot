@@ -41,6 +41,7 @@ from app.core.bot_text_store import (
     reset_bot_text,
     set_bot_text,
 )
+from app.core.browser_tab_state import load_tab_storage_state, save_tab_storage_state
 from app.core.encryption import EncryptionError
 from app.core.job_history import (
     JobHistoryEntry,
@@ -117,6 +118,8 @@ from app.fetchers.browser_interaction import (
     InteractiveElement,
     activate_interactive_element,
     extract_interactive_elements,
+    extract_page_links,
+    option_label,
 )
 from app.version import APP_VERSION
 from app.search.providers import (
@@ -151,6 +154,7 @@ HELP_TEXT = text("help", "en")
 pending_cookie_imports: dict[int, str] = {}
 pending_user_inputs: dict[int, str] = {}
 pending_interactions: dict[tuple[int, str], list[InteractiveElement]] = {}
+job_tab_ids: dict[str, str] = {}
 POLICY_CATEGORY_NAMES = POLICY_CATEGORIES
 
 
@@ -162,6 +166,10 @@ def begin_user_input(user_id: int, mode: str) -> None:
 
 def consume_user_input(user_id: int) -> str | None:
     return pending_user_inputs.pop(user_id, None)
+
+
+def invalidate_page_options(user_id: int, tab_id: str) -> None:
+    pending_interactions.pop((user_id, tab_id), None)
 
 
 def policy_category_label(category: str, language: str) -> str:
@@ -632,7 +640,12 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
     if parsed.action == "refresh":
         url_session_store.touch(session.session_id, message.message_id)
         await message.edit_text(
-            text("url_refreshed", language, url=session.url)
+            text(
+                "url_refreshed",
+                language,
+                title=session.title or urlparse(session.url).hostname or session.url,
+                url=session.url,
+            )
             + (
                 "\n\n" + text("media_site_note", language)
                 if is_protected_media_domain(urlparse(session.url).hostname or "")
@@ -647,7 +660,12 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
             await message.answer(text("tab_back_unavailable", language))
             return
         await message.edit_text(
-            text("url_refreshed", language, url=previous.url),
+            text(
+                "url_refreshed",
+                language,
+                title=previous.title or urlparse(previous.url).hostname or previous.url,
+                url=previous.url,
+            ),
             reply_markup=url_action_keyboard(previous.session_id, language),
         )
         return
@@ -660,6 +678,7 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
                 settings.interaction_max_elements,
                 browser_cookies_for_user_url(user_id, session.url),
                 browser_proxy_for_target(session.url),
+                browser_storage_for_tab(user_id, session.session_id),
             )
         except Exception as exc:
             logger.warning("Interaction extraction failed: exception_type=%s", type(exc).__name__)
@@ -672,26 +691,28 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
         await message.answer(
             text("interaction_choose", language),
             reply_markup=interaction_keyboard(
-                session.session_id, [element.label for element in elements]
+                session.session_id,
+                [option_label(element, session.url) for element in elements],
             ),
         )
         return
     if parsed.action == "links":
         try:
-            async with HttpFetcher(
-                proxy_url=http_proxy_for_target(session.url)
-            ) as fetcher:
-                response = await fetcher.fetch(session.url)
-            links = LinkExtractor.extract(
-                safe_response_text(response), str(response.url)
+            links = await extract_page_links(
+                session.url,
+                get_settings().interaction_timeout_seconds,
+                browser_cookies_for_user_url(user_id, session.url),
+                browser_proxy_for_target(session.url),
+                browser_storage_for_tab(user_id, session.session_id),
             )
             await message.answer(
                 "\n".join(links[:50])[:4000] if links else text("no_links", language)
             )
-        except (URLValidationError, FetchError) as exc:
-            await message.answer(text("request_failed", language, error=str(exc)))
         except RoutingError:
             await message.answer(text("proxy_not_configured", language))
+        except Exception as exc:
+            logger.warning("Tab link extraction failed: exception_type=%s", type(exc).__name__)
+            await message.answer(text("browser_request_failed", language))
         return
 
     command = "html_rendered" if parsed.action == "rendered_html" else parsed.action
@@ -708,6 +729,8 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
         else:
             http_proxy_for_target(session.url)
         job = create_background_job_for_user(user_id, command, session.url)
+        if command in {"html_rendered", "screenshot", "pdf"}:
+            job_tab_ids[job.id] = session.session_id
         if command == "download":
             download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
         await message.answer(
@@ -1633,6 +1656,15 @@ def browser_cookies_for_user_url(user_id: int, url: str) -> tuple[dict, ...]:
     return tuple(load_cookies_for_domain(user_id, hostname))
 
 
+def browser_storage_for_tab(user_id: int, tab_id: str) -> dict | None:
+    return load_tab_storage_state(user_id, tab_id)
+
+
+def browser_storage_for_job(job: Job) -> dict | None:
+    tab_id = job_tab_ids.get(job.id)
+    return browser_storage_for_tab(job.user_id, tab_id) if tab_id else None
+
+
 async def run_html_job(job: Job, message: Message) -> None:
     settings = get_settings()
     language = get_language(job.user_id)
@@ -1710,6 +1742,7 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
             minimum_free_mb=settings.min_free_disk_mb,
             cookies=browser_cookies_for_job(job),
             proxy_server=browser_proxy_for_target(job.url),
+            storage_state=browser_storage_for_job(job),
         )
         result = await export_rendered_html(
             job.url, Path(settings.downloads_dir), options
@@ -1736,7 +1769,9 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
             progress=100,
             result_message=text("rendered_html_sent", language, filename=result.filename),
         )
+        job_tab_ids.pop(job.id, None)
     except asyncio.CancelledError:
+        job_tab_ids.pop(job.id, None)
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
@@ -1902,6 +1937,7 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
             minimum_free_mb=settings.min_free_disk_mb,
             cookies=browser_cookies_for_job(job),
             proxy_server=browser_proxy_for_target(job.url),
+            storage_state=browser_storage_for_job(job),
         )
         result = await capture_screenshot(
             job.url, Path(settings.downloads_dir), options
@@ -1926,7 +1962,9 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
             progress=100,
             result_message=text("screenshot_sent", language, filename=result.filename),
         )
+        job_tab_ids.pop(job.id, None)
     except asyncio.CancelledError:
+        job_tab_ids.pop(job.id, None)
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
@@ -1995,6 +2033,7 @@ async def run_pdf_job(job: Job, message: Message) -> None:
             minimum_free_mb=settings.min_free_disk_mb,
             cookies=browser_cookies_for_job(job),
             proxy_server=browser_proxy_for_target(job.url),
+            storage_state=browser_storage_for_job(job),
         )
         result = await export_pdf(job.url, Path(settings.downloads_dir), options)
         job_store.update_job(job.id, progress=90)
@@ -2017,7 +2056,9 @@ async def run_pdf_job(job: Job, message: Message) -> None:
             progress=100,
             result_message=text("pdf_sent", language, filename=result.filename),
         )
+        job_tab_ids.pop(job.id, None)
     except asyncio.CancelledError:
+        job_tab_ids.pop(job.id, None)
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
@@ -2050,6 +2091,7 @@ async def run_pdf_job(job: Job, message: Message) -> None:
 
 
 async def fail_job(job_id: str, message: Message, error: str) -> None:
+    job_tab_ids.pop(job_id, None)
     job_store.update_job(job_id, status="failed", error_message=error)
     await message.answer(text(
         "job_failed", get_language(get_user_id(message)), job_id=job_id, error=error
@@ -2226,26 +2268,49 @@ async def interaction_callback_handler(callback: CallbackQuery) -> None:
             session_id, user_id, get_settings().url_session_ttl_minutes
         )
         element = elements[index]
-        final_url, title = await activate_interactive_element(
+        result = await activate_interactive_element(
             session.url,
             element,
             get_settings().interaction_timeout_seconds,
             browser_cookies_for_user_url(user_id, session.url),
             browser_proxy_for_target(session.url),
+            browser_storage_for_tab(user_id, session_id),
         )
-        validate_action_url(final_url)
-        updated = url_session_store.navigate(session_id, user_id, final_url, title)
+        invalidate_page_options(user_id, session_id)
+        validate_action_url(result.final_url)
+        updated = url_session_store.navigate(
+            session_id, user_id, result.final_url, result.title
+        )
     except Exception as exc:
         logger.warning("Interaction activation failed: exception_type=%s", type(exc).__name__)
         await callback.answer(text("interaction_failed", language), show_alert=True)
         return
-    pending_interactions.pop((user_id, session_id), None)
+    state_saved = False
+    try:
+        if result.storage_state is not None:
+            state_saved = save_tab_storage_state(
+                user_id, session_id, result.storage_state
+            )
+    except (EncryptionError, OSError, ValueError) as exc:
+        logger.warning(
+            "Browser tab state could not be saved: tab_id=%s exception_type=%s",
+            session_id,
+            type(exc).__name__,
+        )
     await callback.answer()
     if callback.message is not None and updated is not None:
-        await callback.message.answer(
-            text("url_refreshed", language, url=updated.url),
+        await callback.message.edit_text(
+            text(
+                "url_refreshed",
+                language,
+                title=updated.title or urlparse(updated.url).hostname or updated.url,
+                url=updated.url,
+            ),
             reply_markup=url_action_keyboard(updated.session_id, language),
         )
+        await callback.message.answer(text("page_option_applied", language))
+        if not state_saved:
+            await callback.message.answer(text("page_state_not_saved", language))
 
 
 @router.message()

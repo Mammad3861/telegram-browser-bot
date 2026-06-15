@@ -35,6 +35,8 @@ Some sites block headless browsers or require JavaScript, authentication, or CAP
 
 Page interaction is intentionally limited to visible links and simple buttons. It does not fill forms, submit passwords, pass CAPTCHAs, bypass paywalls, or bypass DRM. Some sites therefore cannot work fully inside Telegram or a headless browser.
 
+Page options saves updated URL/title and encrypted Playwright storage state when `COOKIE_ENCRYPTION_KEY` is configured. Without that key, the URL/title still persist but cookies and browser storage are skipped. Some sites may reset state, use unsupported session mechanisms, or block headless browsers, so a consent or confirmation screen can still reappear.
+
 ## Direct Download Rejected
 
 Direct Download accepts direct file links only. The bot checks redirects, headers, content type, disposition, and common file extensions. A normal HTML page is rejected even if that page contains links to files.
