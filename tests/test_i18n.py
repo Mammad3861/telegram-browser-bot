@@ -155,3 +155,22 @@ def test_preferred_persian_menu_and_action_terms() -> None:
     assert text("url_screenshot_button", "fa") == "تصویر صفحه"
     assert text("url_links_button", "fa") == "لینک‌ها"
     assert text("route_no_rules", "fa") == "قانونی ثبت نشده است."
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "download_uncertain",
+        "download_confirm_button",
+        "download_cancel_button",
+        "download_admin_force_button",
+        "url_find_downloads_button",
+        "download_discovery_none",
+        "protected_media_download",
+        "download_risk_acceptance",
+    ],
+)
+def test_flexible_download_messages_are_bilingual(key: str) -> None:
+    assert key in TEXTS["en"]
+    assert key in TEXTS["fa"]
+    assert TEXTS["en"][key] != TEXTS["fa"][key]

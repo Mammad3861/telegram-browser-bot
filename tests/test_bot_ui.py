@@ -16,7 +16,10 @@ from app.bot.ui import (
     parse_url_callback_data,
     url_action_keyboard,
     url_callback_data,
+    download_confirmation_keyboard,
 )
+from app.bot.handlers import download_action_for
+from app.fetchers.file_detector import FileDetection
 
 
 def test_callback_data_round_trip() -> None:
@@ -71,12 +74,12 @@ def test_about_text_contains_version_and_runtime_without_secrets() -> None:
     about = text(
         "about",
         "en",
-        version="1.7.3-alpha.1",
+        version="1.8.0-alpha.1",
         runtime_target="Linux/Ubuntu 24.04 or Docker",
     )
 
     assert "Telegram Browser Bot" in about
-    assert "1.7.3-alpha.1" in about
+    assert "1.8.0-alpha.1" in about
     assert "Linux/Ubuntu 24.04 or Docker" in about
     assert "TOKEN" not in about
 
@@ -110,6 +113,7 @@ def test_persian_url_action_button_labels() -> None:
         text("url_rendered_html_button", "fa"),
         text("url_links_button", "fa"),
         text("url_download_button", "fa"),
+        text("url_find_downloads_button", "fa"),
         text("url_refresh_button", "fa"),
         text("url_back_button", "fa"),
         text("url_interact_button", "fa"),
@@ -129,6 +133,22 @@ def test_old_page_options_are_invalidated() -> None:
     invalidate_page_options(123, "abc12345")
 
     assert (123, "abc12345") not in pending_interactions
+
+
+def test_download_mode_decisions_and_admin_force_button() -> None:
+    uncertain = FileDetection("uncertain", "unknown_response")
+    verify = FileDetection("verify", "file_extension")
+    assert download_action_for("safe", verify, False) == "verify"
+    assert download_action_for("safe", uncertain, False) == "reject"
+    assert download_action_for("confirm_unknown", uncertain, False) == "confirm"
+    assert download_action_for("admin_override", uncertain, False) == "confirm"
+    assert download_action_for("admin_override", uncertain, True) == "confirm_admin"
+    assert download_action_for("invalid", uncertain, False) == "reject"
+
+    user_labels = [button.text for row in download_confirmation_keyboard("abc12345", "en").inline_keyboard for button in row]
+    admin_labels = [button.text for row in download_confirmation_keyboard("abc12345", "en", True).inline_keyboard for button in row]
+    assert text("download_admin_force_button", "en") not in user_labels
+    assert text("download_admin_force_button", "en") in admin_labels
 
 @pytest.mark.parametrize("mode", ["search", "url"])
 def test_button_first_input_flow_state(mode: str) -> None:

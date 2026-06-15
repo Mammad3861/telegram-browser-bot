@@ -37,7 +37,7 @@ These require an administrator or allowed user.
 | `/html <url>` | Export server-provided HTTP HTML. |
 | `/html_rendered <url>` | Export Playwright-rendered HTML. |
 | `/rendered_html <url>` | Alias for `/html_rendered`. |
-| `/download <url>` | Stream a direct file URL to local storage and Telegram. |
+| `/download <url>` | Download a direct file or confirm an uncertain candidate when configured. |
 | `/screenshot <url>` | Capture a full-page PNG. |
 | `/pdf <url>` | Export a page as PDF. |
 | `/status <job_id>` | Show an active or historical job. |
@@ -49,6 +49,8 @@ These require an administrator or allowed user.
 | `/delete_session <domain>` | Delete one saved cookie session. |
 
 You can also send a single public URL without a command to create a persistent browser tab card. Its buttons provide Back, Refresh, Links, Screenshot, PDF, HTML, Rendered HTML, direct Download, Page options, and Close actions.
+
+Find downloads scans visible page links for normal file candidates and lets the user choose one. It does not auto-download files, inspect streaming manifests, or extract protected streams. Uncertain attempts show metadata and a risk-acceptance confirmation. Users must download only files they are authorized to receive.
 
 Page options lists up to the configured number of visible links and simple buttons. A selected option updates the tab URL/title and, when encryption is configured, saves browser storage for later tab actions. It may help with cookie consent and simple age-confirmation screens. It never fills forms, submits passwords, or automatically passes age/consent gates; the user must choose an option explicitly.
 

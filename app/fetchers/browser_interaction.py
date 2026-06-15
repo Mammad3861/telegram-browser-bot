@@ -12,6 +12,7 @@ from playwright.async_api import async_playwright
 from app.core.content_policy import validate_configured_policy
 from app.core.url_validation import URLValidationError
 from app.fetchers.browser_context import create_isolated_context
+from app.fetchers.file_detector import looks_like_download_link
 
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,56 @@ async def extract_page_links(
                 if len(links) >= 50:
                     break
             return links
+        finally:
+            await browser.close()
+
+
+async def discover_download_links(
+    url: str,
+    timeout_seconds: float,
+    max_links: int,
+    cookies: tuple[dict, ...] = (),
+    proxy_server: str | None = None,
+    storage_state: dict[str, Any] | None = None,
+) -> list[tuple[str, str]]:
+    await _validate_target(url)
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(
+            headless=True, proxy={"server": proxy_server} if proxy_server else None
+        )
+        try:
+            context = await create_isolated_context(
+                browser, cookies, storage_state=storage_state
+            )
+            page = await context.new_page()
+            await page.goto(
+                url, wait_until="domcontentloaded", timeout=int(timeout_seconds * 1000)
+            )
+            items = await page.locator("a[href]").evaluate_all(
+                """els => els.filter(e => e.offsetParent !== null).map(e => ({
+                  href: e.href,
+                  text: (e.innerText || e.getAttribute('aria-label') || '').trim(),
+                  rel: e.rel || ''
+                }))"""
+            )
+            results: list[tuple[str, str]] = []
+            for item in items:
+                href = item.get("href") if isinstance(item, dict) else None
+                if not isinstance(href, str) or not looks_like_download_link(
+                    href, str(item.get("text", "")), str(item.get("rel", ""))
+                ):
+                    continue
+                try:
+                    validated = await _validate_target(href)
+                except (URLValidationError, ValueError, OSError):
+                    continue
+                if any(existing[0] == validated for existing in results):
+                    continue
+                label = " ".join(str(item.get("text") or urlparse(validated).path.rsplit("/", 1)[-1]).split())
+                results.append((validated, label[:80] or "download"))
+                if len(results) >= max_links:
+                    break
+            return results
         finally:
             await browser.close()
 

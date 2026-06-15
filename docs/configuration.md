@@ -48,12 +48,17 @@ Telegram chooses localized native command descriptions using the Telegram client
 | `MAX_DOWNLOAD_SIZE_MB` | `50` | Maximum direct download size. |
 | `TELEGRAM_MAX_UPLOAD_SIZE_MB` | `50` | Local Telegram upload threshold. |
 | `MAX_DOWNLOADS_PER_USER_PER_DAY` | `10` | In-memory per-user daily direct-download quota. |
+| `DOWNLOAD_MODE` | `safe` | `safe`, `confirm_unknown`, or `admin_override`. |
+| `ENABLE_DOWNLOAD_DISCOVERY` | `true` | Enables Find downloads on browser tabs. |
+| `DOWNLOAD_DISCOVERY_MAX_LINKS` | `10` | Maximum candidates shown per page. |
 | `MAX_CONCURRENT_JOBS_GLOBAL` | `3` | Global active job limit. |
 | `MAX_CONCURRENT_JOBS_PER_USER` | `1` | Per-user active job limit. |
 | `CLEANUP_MAX_AGE_HOURS` | `24` | Retention used by `/cleanup`. |
 | `DELETE_GENERATED_FILES_AFTER_SEND` | `true` | Delete generated files after successful upload. |
 
 Cleanup only targets generated `html`, `html_rendered`, `files`, `screenshots`, and `pdf` directories. Persistent stores are excluded.
+
+`safe` downloads only confident files or strong file URLs verified by body sniffing. `confirm_unknown` lets users explicitly accept an uncertain attempt. `admin_override` behaves the same for users and adds an administrator-only force button. Every mode retains URL/SSRF validation, content policy, protected-streaming blocks, size limits, and HTML/manifest rejection.
 
 ## Search
 

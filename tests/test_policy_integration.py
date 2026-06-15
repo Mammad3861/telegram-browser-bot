@@ -91,6 +91,9 @@ def test_protected_media_page_download_is_blocked(tmp_path, monkeypatch) -> None
         else:
             raise AssertionError("protected media page download was allowed")
 
+    with pytest.raises(PermissionError):
+        handlers.validate_action_url("https://youtube.com/video.mp4", "download")
+
 
 def test_direct_file_url_remains_allowed(tmp_path, monkeypatch) -> None:
     settings = Settings(

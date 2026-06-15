@@ -7,7 +7,12 @@ import httpx
 
 from app.core.storage import ensure_free_space
 from app.core.url_validation import validate_url
-from app.fetchers.file_detector import choose_filename, is_direct_file
+from app.fetchers.file_detector import (
+    FileDetection,
+    choose_filename,
+    detect_file,
+    looks_like_html,
+)
 from app.fetchers.http_fetcher import FetchError, HttpFetcher
 
 
@@ -41,12 +46,51 @@ class FileDownloader(HttpFetcher):
     ) -> None:
         super().__init__(transport=transport, max_response_bytes=0, proxy_url=proxy_url)
 
+    async def inspect(self, url: str, max_size_mb: int) -> FileDetection:
+        current_url = validate_url(url)
+        max_bytes = max_size_mb * 1024 * 1024
+        for _ in range(6):
+            await self._validate_destination(current_url)
+            try:
+                response = await self.client.head(current_url)
+            except httpx.HTTPError:
+                fallback = detect_file(current_url)
+                return fallback if fallback.confident else FileDetection(
+                    "uncertain", "head_unavailable", final_url=current_url
+                )
+            if response.status_code >= 400:
+                fallback = detect_file(str(response.url))
+                return fallback if fallback.confident else FileDetection(
+                    "uncertain", "head_unavailable", final_url=str(response.url)
+                )
+            if response.is_redirect:
+                location = response.headers.get("location")
+                if not location:
+                    return FileDetection("uncertain", "redirect_without_location", final_url=current_url)
+                current_url = urljoin(str(response.url), location)
+                continue
+            length = response.headers.get("content-length")
+            try:
+                content_length = int(length) if length else None
+            except ValueError:
+                content_length = None
+            if content_length is not None and content_length > max_bytes:
+                raise DownloadError(f"File exceeds the {max_size_mb} MB download limit")
+            return detect_file(
+                str(response.url),
+                response.headers.get("content-type"),
+                response.headers.get("content-disposition"),
+                content_length,
+            )
+        raise DownloadError("Too many redirects")
+
     async def download(
         self,
         url: str,
         downloads_dir: Path,
         max_size_mb: int,
         minimum_free_mb: int,
+        allow_uncertain: bool = False,
     ) -> DownloadResult:
         current_url = validate_url(url)
         max_bytes = max_size_mb * 1024 * 1024
@@ -82,7 +126,12 @@ class FileDownloader(HttpFetcher):
                     response.raise_for_status()
                     content_type = response.headers.get("content-type", "application/octet-stream")
                     disposition = response.headers.get("content-disposition")
-                    if not is_direct_file(str(response.url), content_type, disposition):
+                    detection = detect_file(
+                        str(response.url), content_type, disposition
+                    )
+                    if detection.confidence == "rejected" or (
+                        not detection.confident and not allow_uncertain
+                    ):
                         raise DownloadError("This version only supports direct file links.")
 
                     content_length = response.headers.get("content-length")
@@ -103,7 +152,17 @@ class FileDownloader(HttpFetcher):
 
                     try:
                         with output_path.open("xb") as output:
+                            first_chunk = True
                             async for chunk in response.aiter_bytes():
+                                if first_chunk:
+                                    first_chunk = False
+                                    if looks_like_html(chunk) and not (
+                                        disposition
+                                        and "attachment" in disposition.lower()
+                                    ):
+                                        raise DownloadError(
+                                            "The response is an HTML page, not a downloadable file."
+                                        )
                                 downloaded += len(chunk)
                                 if downloaded > max_bytes:
                                     raise DownloadError(

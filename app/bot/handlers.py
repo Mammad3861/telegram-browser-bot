@@ -16,6 +16,7 @@ from app.core.access_store import (
     list_allowed_users,
 )
 from app.core.download_quota import download_quota
+from app.core.download_requests import download_request_store
 from app.core.cookies import CookieValidationError, normalize_domain, validate_cookies_json
 from app.core.command_args import CommandArgumentError, parse_single_url_arg
 from app.core.cleanup import cleanup_generated_files
@@ -80,6 +81,8 @@ from app.bot.i18n import TEXTS, bot_text, get_language, set_language, text
 from app.bot.commands import register_bot_commands
 from app.bot.ui import (
     detect_plain_url,
+    download_candidates_keyboard,
+    download_confirmation_keyboard,
     interaction_keyboard,
     menu_keyboard,
     parse_url_callback_data,
@@ -111,7 +114,7 @@ from app.fetchers.browser_html import (
 )
 from app.fetchers.browser_diagnostics import map_browser_runtime_error
 from app.fetchers.file_downloader import DownloadError, FileDownloader
-from app.fetchers.file_detector import is_direct_file
+from app.fetchers.file_detector import FileDetection
 from app.fetchers.html_export import save_html
 from app.fetchers.link_extractor import LinkExtractor
 from app.fetchers.browser_interaction import (
@@ -119,6 +122,7 @@ from app.fetchers.browser_interaction import (
     activate_interactive_element,
     extract_interactive_elements,
     extract_page_links,
+    discover_download_links,
     option_label,
 )
 from app.version import APP_VERSION
@@ -154,6 +158,8 @@ HELP_TEXT = text("help", "en")
 pending_cookie_imports: dict[int, str] = {}
 pending_user_inputs: dict[int, str] = {}
 pending_interactions: dict[tuple[int, str], list[InteractiveElement]] = {}
+pending_download_candidates: dict[tuple[int, str], list[tuple[str, str]]] = {}
+forced_download_jobs: set[str] = set()
 job_tab_ids: dict[str, str] = {}
 POLICY_CATEGORY_NAMES = POLICY_CATEGORIES
 
@@ -254,7 +260,6 @@ def validate_action_url(url: str, command: str | None = None) -> str:
     if (
         command == "download"
         and is_protected_media_domain(hostname)
-        and not is_direct_file(validated)
     ):
         raise PermissionError("protected_media_download")
     return validated
@@ -714,16 +719,42 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
             logger.warning("Tab link extraction failed: exception_type=%s", type(exc).__name__)
             await message.answer(text("browser_request_failed", language))
         return
+    if parsed.action == "find_downloads":
+        settings = get_settings()
+        if not settings.enable_download_discovery:
+            await message.answer(text("download_discovery_disabled", language))
+            return
+        try:
+            candidates = await discover_download_links(
+                session.url,
+                settings.interaction_timeout_seconds,
+                settings.download_discovery_max_links,
+                browser_cookies_for_user_url(user_id, session.url),
+                browser_proxy_for_target(session.url),
+                browser_storage_for_tab(user_id, session.session_id),
+            )
+        except Exception as exc:
+            logger.warning("Download discovery failed: exception_type=%s", type(exc).__name__)
+            await message.answer(text("browser_request_failed", language))
+            return
+        if not candidates:
+            await message.answer(text("download_discovery_none", language))
+            return
+        pending_download_candidates[(user_id, session.session_id)] = candidates
+        await message.answer(
+            text("download_discovery_title", language),
+            reply_markup=download_candidates_keyboard(
+                session.session_id, [label for _, label in candidates]
+            ),
+        )
+        return
 
     command = "html_rendered" if parsed.action == "rendered_html" else parsed.action
     settings = get_settings()
-    if command == "download":
-        if download_quota.remaining(
-            user_id, settings.max_downloads_per_user_per_day
-        ) <= 0:
-            await message.answer(text("daily_quota_exceeded", language))
-            return
     try:
+        if command == "download":
+            await begin_download_flow(message, user_id, session.url)
+            return
         if command in {"html_rendered", "screenshot", "pdf"}:
             browser_proxy_for_target(session.url)
         else:
@@ -731,8 +762,6 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
         job = create_background_job_for_user(user_id, command, session.url)
         if command in {"html_rendered", "screenshot", "pdf"}:
             job_tab_ids[job.id] = session.session_id
-        if command == "download":
-            download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
         await message.answer(
             text(
                 "job_started",
@@ -750,7 +779,7 @@ async def url_action_callback_handler(callback: CallbackQuery) -> None:
         }[command]
         task = asyncio.create_task(runner(job, message))
         job_store.register_task(job.id, task)
-    except JobLimitError as exc:
+    except (JobLimitError, DownloadError, URLValidationError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
     except RoutingError:
         await message.answer(text("proxy_not_configured", language))
@@ -1813,36 +1842,102 @@ def format_download_info(
     )
 
 
+def format_detection_size(size: int | None) -> str:
+    return f"{size} bytes" if size is not None else "unknown"
+
+
+def download_action_for(mode: str, detection: FileDetection, admin: bool) -> str:
+    if mode not in {"safe", "confirm_unknown", "admin_override"}:
+        mode = "safe"
+    if detection.confident:
+        return "download"
+    if detection.confidence == "verify":
+        return "verify"
+    if detection.confidence == "rejected" or mode == "safe":
+        return "reject"
+    if mode == "admin_override" and admin:
+        return "confirm_admin"
+    return "confirm"
+
+
+async def start_download_job(
+    message: Message, user_id: int, url: str, force: bool = False
+) -> None:
+    settings = get_settings()
+    language = get_language(user_id)
+    if download_quota.remaining(user_id, settings.max_downloads_per_user_per_day) <= 0:
+        await message.answer(text("daily_quota_exceeded", language))
+        return
+    job = create_background_job_for_user(user_id, "download", url)
+    if force:
+        forced_download_jobs.add(job.id)
+    download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
+    await message.answer(text(
+        "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
+    ))
+    task = asyncio.create_task(run_download_job(job, message))
+    job_store.register_task(job.id, task)
+
+
+async def begin_download_flow(message: Message, user_id: int, url: str) -> None:
+    settings = get_settings()
+    language = get_language(user_id)
+    url = validate_action_url(url, "download")
+    http_proxy_for_target(url)
+    async with FileDownloader(proxy_url=http_proxy_for_target(url)) as downloader:
+        detection = await downloader.inspect(url, settings.max_download_size_mb)
+    mode = settings.download_mode.lower()
+    action = download_action_for(mode, detection, is_admin(user_id))
+    if action in {"download", "verify"}:
+        await message.answer(text(
+            "download_direct_accepted", language, reason=text(
+                f"download_reason_{detection.reason}", language
+            )
+        ))
+        await start_download_job(message, user_id, url, force=action == "verify")
+        return
+    if action == "reject":
+        await message.answer(text("direct_file_only", language))
+        return
+    request = download_request_store.create(
+        user_id,
+        url,
+        detection,
+        admin_force_allowed=action == "confirm_admin",
+    )
+    await message.answer(
+        text(
+            "download_uncertain",
+            language,
+            content_type=detection.content_type or text("unknown", language),
+            size=format_detection_size(detection.content_length),
+            final_url=detection.final_url or url,
+            risk=text("download_risk_acceptance", language),
+        ),
+        reply_markup=download_confirmation_keyboard(
+            request.request_id, language, request.admin_force_allowed
+        ),
+    )
+
+
 @router.message(Command("download"))
 async def download_handler(message: Message, command: CommandObject) -> None:
     if await reject_unless_allowed(message):
         return
     user_id = get_user_id(message)
     language = get_language(user_id)
-    settings = get_settings()
-    if user_id is None or download_quota.remaining(
-        user_id, settings.max_downloads_per_user_per_day
-    ) <= 0:
-        await message.answer(text("daily_quota_exceeded", language))
+    if user_id is None:
         return
 
     try:
-        url = validate_action_url(parse_single_url_arg(command.args), "download")
-        http_proxy_for_target(url)
-        job = create_background_job(message, "download", url)
-        download_quota.consume(user_id, settings.max_downloads_per_user_per_day)
-        await message.answer(text(
-            "job_started", language, job_id=job.id, status=job_status_text(job.status, language)
-        ))
-        task = asyncio.create_task(run_download_job(job, message))
-        job_store.register_task(job.id, task)
+        await begin_download_flow(message, user_id, parse_single_url_arg(command.args))
     except CommandArgumentError:
         await message.answer(text("url_usage", language, command="download"))
     except PermissionError as exc:
         await message.answer(permission_error_message(exc, language))
     except RoutingError:
         await message.answer(text("proxy_not_configured", language))
-    except (URLValidationError, JobLimitError) as exc:
+    except (URLValidationError, JobLimitError, DownloadError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
 
 
@@ -1857,6 +1952,7 @@ async def run_download_job(job: Job, message: Message) -> None:
                 Path(settings.downloads_dir),
                 settings.max_download_size_mb,
                 settings.min_free_disk_mb,
+                allow_uncertain=job.id in forced_download_jobs,
             )
         job_store.update_job(job.id, progress=80)
         info = format_download_info(
@@ -1879,7 +1975,9 @@ async def run_download_job(job: Job, message: Message) -> None:
         job_store.update_job(
             job.id, status="success", progress=100, result_message=result_message
         )
+        forced_download_jobs.discard(job.id)
     except asyncio.CancelledError:
+        forced_download_jobs.discard(job.id)
         if (current := job_store.get_job(job.id)) and current.status != "cancelled":
             job_store.update_job(job.id, status="cancelled")
         raise
@@ -1991,6 +2089,7 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
     except RoutingError:
         await fail_job(job.id, message, text("proxy_not_configured", language))
     except Exception as exc:
+        forced_download_jobs.discard(job.id)
         safe_message = text("browser_request_failed", language)
         log_safe_job_error(job, exc, safe_message)
         await fail_job(job.id, message, safe_message)
@@ -2092,6 +2191,7 @@ async def run_pdf_job(job: Job, message: Message) -> None:
 
 async def fail_job(job_id: str, message: Message, error: str) -> None:
     job_tab_ids.pop(job_id, None)
+    forced_download_jobs.discard(job_id)
     job_store.update_job(job_id, status="failed", error_message=error)
     await message.answer(text(
         "job_failed", get_language(get_user_id(message)), job_id=job_id, error=error
@@ -2311,6 +2411,65 @@ async def interaction_callback_handler(callback: CallbackQuery) -> None:
         await callback.message.answer(text("page_option_applied", language))
         if not state_saved:
             await callback.message.answer(text("page_state_not_saved", language))
+
+
+@router.callback_query(F.data.startswith("download_confirm:"))
+async def download_confirmation_callback_handler(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    language = get_language(user_id)
+    parts = (callback.data or "").split(":")
+    if len(parts) != 3 or parts[2] not in {"confirm", "cancel", "force"}:
+        await callback.answer(text("invalid_action", language), show_alert=True)
+        return
+    request = download_request_store.get(parts[1], user_id)
+    if request is None:
+        await callback.answer(text("download_confirmation_expired", language), show_alert=True)
+        return
+    if parts[2] == "cancel":
+        await callback.answer()
+        if callback.message is not None:
+            await callback.message.edit_text(text("download_cancelled", language))
+        return
+    if parts[2] == "force" and not (request.admin_force_allowed and is_admin(user_id)):
+        await callback.answer(text("admin_required", language), show_alert=True)
+        return
+    download_request_store.pop(parts[1], user_id)
+    try:
+        validate_action_url(request.url, "download")
+        if callback.message is not None:
+            await callback.message.edit_text(text("download_confirmed", language))
+            await start_download_job(callback.message, user_id, request.url, force=True)
+        await callback.answer()
+    except PermissionError as exc:
+        await callback.answer(permission_error_message(exc, language), show_alert=True)
+    except (URLValidationError, JobLimitError, RoutingError) as exc:
+        logger.warning("Confirmed download could not start: exception_type=%s", type(exc).__name__)
+        await callback.answer(text("request_failed", language, error=str(exc)), show_alert=True)
+
+
+@router.callback_query(F.data.startswith("download_candidate:"))
+async def download_candidate_callback_handler(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    language = get_language(user_id)
+    parts = (callback.data or "").split(":")
+    if len(parts) != 3 or not parts[2].isdigit():
+        await callback.answer(text("invalid_action", language), show_alert=True)
+        return
+    candidates = pending_download_candidates.get((user_id, parts[1]))
+    index = int(parts[2])
+    if candidates is None or index >= len(candidates):
+        await callback.answer(text("download_confirmation_expired", language), show_alert=True)
+        return
+    pending_download_candidates.pop((user_id, parts[1]), None)
+    try:
+        if callback.message is not None:
+            await begin_download_flow(callback.message, user_id, candidates[index][0])
+        await callback.answer()
+    except PermissionError as exc:
+        await callback.answer(permission_error_message(exc, language), show_alert=True)
+    except (URLValidationError, JobLimitError, RoutingError, DownloadError) as exc:
+        logger.warning("Download candidate could not start: exception_type=%s", type(exc).__name__)
+        await callback.answer(text("request_failed", language, error=str(exc)), show_alert=True)
 
 
 @router.message()

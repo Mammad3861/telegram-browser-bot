@@ -20,7 +20,9 @@ async def allow_test_destination(_: str) -> None:
     return None
 
 
-def run_download(handler, tmp_path, max_size_mb=1, url="https://example.com/file.pdf"):
+def run_download(
+    handler, tmp_path, max_size_mb=1, url="https://example.com/file.pdf", allow_uncertain=False
+):
     async def execute():
         async with FileDownloader(transport=httpx.MockTransport(handler)) as downloader:
             downloader._validate_destination = allow_test_destination  # type: ignore[method-assign]
@@ -29,6 +31,7 @@ def run_download(handler, tmp_path, max_size_mb=1, url="https://example.com/file
                 tmp_path,
                 max_size_mb=max_size_mb,
                 minimum_free_mb=0,
+                allow_uncertain=allow_uncertain,
             )
 
     return asyncio.run(execute())
@@ -130,3 +133,66 @@ def test_follows_redirect_to_direct_file(tmp_path) -> None:
     result = run_download(handler, tmp_path, url="https://example.com/start")
 
     assert result.filename == "file.msi"
+
+
+def test_unknown_response_requires_explicit_uncertain_mode(tmp_path) -> None:
+    async def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/x-custom"},
+            stream=ChunkStream([b"binary data"]),
+        )
+
+    with pytest.raises(DownloadError, match="direct file links"):
+        run_download(handler, tmp_path, url="https://example.com/export")
+
+    result = run_download(
+        handler, tmp_path, url="https://example.com/export", allow_uncertain=True
+    )
+    assert result.size == len(b"binary data")
+
+
+def test_confirmed_unknown_html_is_still_rejected(tmp_path) -> None:
+    async def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/x-custom"},
+            stream=ChunkStream([b"<!doctype html><html></html>"]),
+        )
+
+    with pytest.raises(DownloadError, match="HTML page"):
+        run_download(
+            handler, tmp_path, url="https://example.com/export", allow_uncertain=True
+        )
+
+
+def test_misleading_html_header_with_file_extension_uses_body_sniff(tmp_path) -> None:
+    async def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            stream=ChunkStream([b"MZ binary installer"]),
+        )
+
+    result = run_download(
+        handler,
+        tmp_path,
+        url="https://example.com/installer.msi",
+        allow_uncertain=True,
+    )
+    assert result.filename == "installer.msi"
+
+
+def test_explicit_html_attachment_is_allowed(tmp_path) -> None:
+    async def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={
+                "content-type": "text/html",
+                "content-disposition": 'attachment; filename="page.html"',
+            },
+            stream=ChunkStream([b"<!doctype html><html></html>"]),
+        )
+
+    result = run_download(handler, tmp_path, url="https://example.com/export")
+    assert result.filename == "page.html"

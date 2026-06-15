@@ -73,6 +73,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "url_rendered_html_button": "Rendered HTML",
         "url_links_button": "Links",
         "url_download_button": "Download",
+        "url_find_downloads_button": "Find downloads",
         "url_refresh_button": "Refresh",
         "url_cancel_button": "Cancel",
         "url_back_button": "Back",
@@ -191,7 +192,30 @@ TEXTS: dict[str, dict[str, str]] = {
         "browser_request_failed": "Browser request failed.",
         "job_unexpected_failure": "Job failed unexpectedly.",
         "content_policy_blocked": "This site is blocked by the bot content policy.",
-        "protected_media_download": "Direct download from protected streaming platforms is not supported.",
+        "protected_media_download": "Direct downloads from streaming platforms or protected content are not supported. If you have an authorized direct file link, send that file link instead.",
+        "download_uncertain": (
+            "⚠️ This link was not confidently detected as a direct file.\n"
+            "Content type: {content_type}\nApproximate size: {size}\nFinal URL: {final_url}\n\n"
+            "If you trust the source, you can confirm a download attempt.\n\n{risk}"
+        ),
+        "download_risk_acceptance": "By confirming, you state that you trust the link source and are authorized to receive this file.",
+        "download_confirm_button": "Try download",
+        "download_cancel_button": "Cancel",
+        "download_admin_force_button": "Admin: force download",
+        "download_confirmed": "Download attempt confirmed.",
+        "download_cancelled": "Download cancelled.",
+        "download_confirmation_expired": "This download confirmation expired. Try again.",
+        "download_direct_accepted": "Direct file accepted ({reason}).",
+        "download_discovery_title": "Downloadable files:",
+        "download_discovery_none": "No downloadable files were found.",
+        "download_discovery_disabled": "Download discovery is disabled.",
+        "download_reason_content_disposition": "attachment filename",
+        "download_reason_file_extension": "file extension",
+        "download_reason_content_type": "content type",
+        "download_reason_download_hint": "download hint",
+        "download_reason_unknown_response": "unknown response",
+        "download_reason_head_unavailable": "metadata unavailable",
+        "unknown": "unknown",
         "media_site_note": (
             "Some media sites may not work fully inside the bot. Browser actions are limited "
             "to safe previews and exports."
@@ -334,6 +358,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "url_rendered_html_button": "HTML رندرشده",
         "url_links_button": "لینک‌ها",
         "url_download_button": "دانلود",
+        "url_find_downloads_button": "فایل‌های قابل دانلود",
         "url_refresh_button": "تازه‌سازی",
         "url_cancel_button": "لغو",
         "url_back_button": "بازگشت",
@@ -450,7 +475,30 @@ TEXTS: dict[str, dict[str, str]] = {
         "browser_request_failed": "مرورگر نتوانست صفحه را باز کند.",
         "job_unexpected_failure": "کار به‌دلیل یک خطای پیش‌بینی‌نشده انجام نشد.",
         "content_policy_blocked": "این سایت طبق سیاست محتوای بات مسدود شده است.",
-        "protected_media_download": "دانلود مستقیم از پلتفرم‌های استریم یا محتوای محافظت‌شده پشتیبانی نمی‌شود.",
+        "protected_media_download": "دانلود مستقیم از پلتفرم‌های استریم یا محتوای محافظت‌شده پشتیبانی نمی‌شود. اگر لینک مستقیم و مجاز فایل را دارید، همان لینک فایل را بفرستید.",
+        "download_uncertain": (
+            "⚠️ این لینک با اطمینان به‌عنوان فایل مستقیم تشخیص داده نشد.\n"
+            "نوع محتوا: {content_type}\nاندازه تقریبی: {size}\nنشانی نهایی: {final_url}\n\n"
+            "اگر به منبع لینک اعتماد دارید، می‌توانید تلاش برای دانلود را تأیید کنید.\n\n{risk}"
+        ),
+        "download_risk_acceptance": "با تأیید، شما اعلام می‌کنید که به منبع لینک اعتماد دارید و مجاز به دریافت این فایل هستید.",
+        "download_confirm_button": "تلاش برای دانلود",
+        "download_cancel_button": "لغو",
+        "download_admin_force_button": "مدیر: تلاش اجباری برای دانلود",
+        "download_confirmed": "تلاش برای دانلود تأیید شد.",
+        "download_cancelled": "دانلود لغو شد.",
+        "download_confirmation_expired": "این تأیید دانلود منقضی شده است. دوباره تلاش کنید.",
+        "download_direct_accepted": "فایل مستقیم پذیرفته شد ({reason}).",
+        "download_discovery_title": "فایل‌های قابل دانلود:",
+        "download_discovery_none": "فایل قابل دانلودی پیدا نشد.",
+        "download_discovery_disabled": "یافتن فایل‌های قابل دانلود غیرفعال است.",
+        "download_reason_content_disposition": "نام فایل پیوست",
+        "download_reason_file_extension": "پسوند فایل",
+        "download_reason_content_type": "نوع محتوا",
+        "download_reason_download_hint": "نشانه دانلود",
+        "download_reason_unknown_response": "پاسخ ناشناخته",
+        "download_reason_head_unavailable": "اطلاعات فایل در دسترس نیست",
+        "unknown": "نامشخص",
         "media_site_note": (
             "ممکن است برخی سایت‌های رسانه‌ای داخل بات کامل کار نکنند. امکانات مرورگر به "
             "پیش‌نمایش و خروجی‌های امن محدود است."

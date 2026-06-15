@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml)
 
-**Current version:** `v1.7.3-alpha.1`
+**Current version:** `v1.8.0-alpha.1`
 
 A Docker-first Telegram bot for safely fetching pages, searching the web, extracting links, downloading direct files, and exporting HTML, screenshots, and PDFs. The supported production target is Ubuntu 24.04 or Docker Compose.
 
@@ -11,7 +11,7 @@ A Docker-first Telegram bot for safely fetching pages, searching the web, extrac
 ## Key Features
 
 - Button-first Telegram browser home, persistent URL tabs, stateful Page options, and provider-labeled search result cards
-- HTTP fetch, link extraction, direct downloads, HTML, rendered HTML, screenshots, and PDF exports
+- HTTP fetch, link extraction, direct and user-confirmed uncertain downloads, HTML, rendered HTML, screenshots, and PDF exports
 - English and Persian UI with persistent language preferences
 - Static and runtime access control with admin commands
 - Administrator-configurable domain/category policy and optional explicit outbound routing
@@ -73,6 +73,7 @@ Advanced slash commands remain available. See the [complete command reference](d
 - The bot does not bypass CAPTCHAs or anti-bot systems and does not scrape Google directly.
 - The bot does not bypass DRM, paywalls, or login restrictions and does not store usernames or passwords.
 - Direct downloads support direct file links only. Some sites do not work fully in a headless browser.
+- Downloads do not rip streams or bypass DRM, CAPTCHA, paywalls, login restrictions, or anti-bot systems. Use downloads only for files you are authorized to receive.
 - Cookie sessions are encrypted locally, isolated by Telegram user and domain, and require a stable encryption key.
 - Username/password login storage and OpenAI/ChatGPT assistant features are not implemented.
 - Persistent data lives under `downloads/`; do not commit it.

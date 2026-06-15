@@ -41,6 +41,8 @@ Page options saves updated URL/title and encrypted Playwright storage state when
 
 Direct Download accepts direct file links only. The bot checks redirects, headers, content type, disposition, and common file extensions. A normal HTML page is rejected even if that page contains links to files.
 
+With `DOWNLOAD_MODE=confirm_unknown`, uncertain links show a confirmation card. `admin_override` additionally gives administrators a force-attempt button, but it never overrides URL safety, content policy, file-size limits, protected streaming blocks, or HTML/stream-manifest rejection. A direct `.mp3` or `.mp4` from a normal permitted file host can work; protected streaming pages cannot.
+
 ## Search Unavailable
 
 `duckduckgo_html` is a basic alpha provider and can fail because of upstream changes, rate limits, or network restrictions. Try again later or send a direct URL to use the normal action card. Check `SEARCH_PROVIDER` and container logs.

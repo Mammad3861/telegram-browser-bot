@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.8.0-alpha.1] - 2026-06-15
+
+### Added
+
+- Configurable `safe`, `confirm_unknown`, and `admin_override` download modes.
+- Owner-bound confirmation cards with metadata, risk acceptance, cancellation, and administrator-only force attempts.
+- Find downloads action for selecting file-like links from browser tabs.
+- Expanded archive, installer, ebook, image, text, audio, and video direct-file detection.
+- Detector reason labels and complete English/Persian download messaging.
+
+### Improved
+
+- HEAD metadata now falls back to streaming GET behavior when unavailable or misleading.
+- Confirmed uncertain downloads still reject HTML bodies, streaming manifests, oversized files, unsafe redirects, and protected streaming domains.
+- Direct media files from ordinary permitted hosts remain supported within policy and size limits.
+
+### Safety
+
+- No stream ripping, HLS/DASH extraction, DRM/CAPTCHA/paywall bypass, credential storage, or automated bulk downloading was added.
+
 ## [v1.7.3-alpha.1] - 2026-06-15
 
 ### Fixed

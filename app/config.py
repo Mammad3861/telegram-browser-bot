@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     max_download_size_mb: int = 50
     telegram_max_upload_size_mb: int = 50
     max_downloads_per_user_per_day: int = 10
+    download_mode: str = "safe"
+    enable_download_discovery: bool = True
+    download_discovery_max_links: int = 10
     max_concurrent_jobs_global: int = 3
     max_concurrent_jobs_per_user: int = 1
     browser_timeout_seconds: float = 45.0
