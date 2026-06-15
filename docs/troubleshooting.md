@@ -8,6 +8,8 @@ Persistent `sessions`, `access`, `preferences`, `texts`, `ui_sessions`, and `job
 
 Use `/storage` to view category sizes and `/cleanup dry_run` to preview old generated files before deleting them.
 
+Telegram admin messages show human-readable units. Health endpoints still include raw byte fields for scripts and monitoring.
+
 ## Docker Permission Denied
 
 The container runs as a non-root user. Fix ownership on the bind mount:

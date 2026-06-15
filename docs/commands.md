@@ -113,3 +113,5 @@ Examples:
 /cleanup dry_run
 /storage
 ```
+
+Admin and storage messages use human-readable units such as `8.65 GB` or `8.65 گیگابایت`. Health endpoints keep raw byte fields for automation.

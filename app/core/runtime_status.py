@@ -7,6 +7,7 @@ from pathlib import Path
 from app.config import Settings
 from app.core.access_store import list_allowed_users
 from app.core.config_validation import persistent_directories
+from app.core.formatting import format_bytes
 from app.core.jobs import ACTIVE_STATUSES, JobStore
 from app.core.job_history import load_job_history
 from app.core.storage_diagnostics import build_storage_summary
@@ -87,7 +88,11 @@ def readiness_payload(settings: Settings) -> dict[str, object]:
         "checks": checks,
         "persistent_store_dirs": persistent_checks,
         "free_bytes": storage_summary.free_bytes,
+        "free_human": format_bytes(storage_summary.free_bytes, "en"),
         "minimum_free_bytes": settings.min_free_disk_mb * 1024 * 1024,
+        "minimum_free_human": format_bytes(
+            settings.min_free_disk_mb * 1024 * 1024, "en"
+        ),
     }
 
 

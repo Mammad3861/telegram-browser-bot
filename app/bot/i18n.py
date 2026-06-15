@@ -150,7 +150,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "invalid_action": "Invalid action.",
         "admin_status": (
             "Version: {version}\nRuntime target: {runtime_target}\nUptime: {uptime_seconds}s\n"
-            "Downloads directory: {downloads_dir}\nStorage free: {free_bytes} bytes\n"
+            "Downloads directory: {downloads_dir}\nStorage free: {free_bytes}\n"
             "Active jobs: {active_jobs}\nKnown jobs: {known_jobs}\nRecent completed jobs: {recent_completed_jobs}\n"
             "URL sessions: {url_sessions}\nSearch sessions: {search_sessions}\nBrowser tab sessions: {browser_tab_sessions}\n"
             "Runtime allowed users: {runtime_users}\nCookie import: {cookie_state}\n"
@@ -307,10 +307,10 @@ TEXTS: dict[str, dict[str, str]] = {
             "Bytes that would be freed: {bytes}"
         ),
         "storage_summary": (
-            "Storage summary\nDownloads directory: {downloads_dir}\nFree space: {free_bytes} bytes\n"
+            "Storage summary\nDownloads directory: {downloads_dir}\nFree space: {free_bytes}\n"
             "Cleanup retention: {cleanup_hours} hours\n\n{categories}"
         ),
-        "storage_category_line": "{category}: {bytes} bytes",
+        "storage_category_line": "{category}: {bytes}",
         "rate_limited": "You are doing that too often. Try again in about {seconds} seconds.",
         "search_rate_limited": "Search limit reached. Try again in about {seconds} seconds.",
         "browser_rate_limited": "Browser action limit reached. Try again in about {seconds} seconds.",
@@ -464,13 +464,13 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
         "none": "هیچ‌کدام",
         "cleanup_failed": "پاک‌سازی انجام نشد؛ فایل‌های تولیدشده حذف نشدند.",
-        "cleanup_summary": "پاک‌سازی انجام شد.\nفایل‌های حذف‌شده: {count}\nفضای آزادشده: {bytes} بایت",
+        "cleanup_summary": "پاک‌سازی انجام شد.\nفایل‌های حذف‌شده: {count}\nفضای آزادشده: {bytes}",
         "purge_history_failed": "تاریخچه کارها پاک نشد.",
         "purge_history_summary": "تاریخچه کارها پاک شد. ورودی‌های حذف‌شده: {count}",
         "invalid_action": "عملیات نامعتبر است.",
         "admin_status": (
             "نسخه: {version}\nمحیط اجرا: {runtime_target}\nزمان اجرا: {uptime_seconds} ثانیه\n"
-            "پوشه دانلودها: {downloads_dir}\nفضای آزاد: {free_bytes} بایت\n"
+            "پوشه دانلودها: {downloads_dir}\nفضای آزاد: {free_bytes}\n"
             "کارهای فعال: {active_jobs}\nکارهای ثبت‌شده: {known_jobs}\nکارهای تکمیل‌شده اخیر: {recent_completed_jobs}\n"
             "نشست‌های URL: {url_sessions}\nنشست‌های جست‌وجو: {search_sessions}\nنشست‌های تب مرورگر: {browser_tab_sessions}\n"
             "کاربران مجاز پویا: {runtime_users}\nورود کوکی: {cookie_state}\n"
@@ -624,13 +624,13 @@ TEXTS: dict[str, dict[str, str]] = {
         "set_text_usage": "روش استفاده: /set_text <key> <lang> <text>",
         "cleanup_dry_run_summary": (
             "بررسی پاک‌سازی انجام شد.\nفایل‌هایی که حذف می‌شوند: {count}\n"
-            "فضایی که آزاد می‌شود: {bytes} بایت"
+            "فضایی که آزاد می‌شود: {bytes}"
         ),
         "storage_summary": (
-            "گزارش فضای ذخیره‌سازی\nپوشه دانلودها: {downloads_dir}\nفضای آزاد: {free_bytes} بایت\n"
+            "گزارش فضای ذخیره‌سازی\nپوشه دانلودها: {downloads_dir}\nفضای آزاد: {free_bytes}\n"
             "نگه‌داری پاک‌سازی: {cleanup_hours} ساعت\n\n{categories}"
         ),
-        "storage_category_line": "{category}: {bytes} بایت",
+        "storage_category_line": "{category}: {bytes}",
         "rate_limited": "این کار را بیش از حد سریع انجام می‌دهید. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
         "search_rate_limited": "سقف جست‌وجو پر شده است. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
         "browser_rate_limited": "سقف عملیات مرورگر پر شده است. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",

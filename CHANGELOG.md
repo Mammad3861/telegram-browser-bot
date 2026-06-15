@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.9.1-alpha.1] - 2026-06-16
+
+### Improved
+
+- Telegram-facing admin, storage, cleanup, browser export, and download messages now show human-readable sizes.
+- English output uses `B`, `KB`, `MB`, `GB`, and `TB`; Persian output uses `بایت`, `کیلوبایت`, `مگابایت`, `گیگابایت`, and `ترابایت`.
+- Readiness health keeps raw byte fields for automation and adds human-readable companion fields.
+
 ## [v1.9.0-alpha.1] - 2026-06-16
 
 ### Added

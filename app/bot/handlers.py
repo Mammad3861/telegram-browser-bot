@@ -22,6 +22,7 @@ from app.core.cookies import CookieValidationError, normalize_domain, validate_c
 from app.core.command_args import CommandArgumentError, parse_single_url_arg
 from app.core.cleanup import cleanup_generated_files
 from app.core.error_mapping import user_safe_error_message
+from app.core.formatting import format_bytes
 from app.core.content_policy import (
     POLICY_CATEGORIES,
     ContentPolicy,
@@ -61,8 +62,9 @@ from app.core.session_store import (
     save_cookies,
 )
 from app.core.runtime_status import RUNTIME_TARGET, build_admin_status
+from app.core.runtime_status import AdminStatus
 from app.core.storage import StorageError
-from app.core.storage_diagnostics import build_storage_summary
+from app.core.storage_diagnostics import StorageSummary, build_storage_summary
 from app.core.rate_limit import effective_rate_limit, rate_limiter
 from app.core.routing import (
     RoutingError,
@@ -1123,11 +1125,15 @@ async def admin_status_handler(message: Message) -> None:
         return
     language = get_language(user_id)
     status = build_admin_status(get_settings(), job_store)
+    await message.answer(format_admin_status(status, language))
+
+
+def format_admin_status(status: AdminStatus, language: str = "en") -> str:
     directories = ", ".join(
         f"{name}={text('ready' if exists else 'missing', language)}"
         for name, exists in status.generated_directories.items()
     )
-    await message.answer(text(
+    return text(
         "admin_status",
         language,
         version=status.version,
@@ -1141,7 +1147,7 @@ async def admin_status_handler(message: Message) -> None:
         search_sessions=status.search_sessions,
         browser_tab_sessions=status.browser_tab_sessions,
         runtime_users=status.runtime_allowed_users,
-        free_bytes=status.storage_free_bytes,
+        free_bytes=format_bytes(status.storage_free_bytes, language),
         cookie_state=text("enabled" if status.cookie_import_enabled else "disabled", language),
         policy_state=text("enabled" if status.content_policy_enabled else "disabled", language),
         search_provider=status.search_provider,
@@ -1151,7 +1157,7 @@ async def admin_status_handler(message: Message) -> None:
         cleanup_after_send=text("enabled" if status.cleanup_after_send_enabled else "disabled", language),
         browser_state=text("ready" if status.browser_features_configured else "missing", language),
         directories=directories,
-    ))
+    )
 
 
 @router.message(Command("cleanup"))
@@ -1174,7 +1180,7 @@ async def cleanup_handler(message: Message, command: CommandObject) -> None:
         "cleanup_dry_run_summary" if result.dry_run else "cleanup_summary",
         language,
         count=result.deleted_files,
-        bytes=result.freed_bytes,
+        bytes=format_bytes(result.freed_bytes, language),
     ))
 
 
@@ -1189,19 +1195,21 @@ async def storage_handler(message: Message) -> None:
     summary = build_storage_summary(
         Path(settings.downloads_dir), settings.cleanup_max_age_hours
     )
+    await message.answer(format_storage_summary(summary, language))
+
+
+def format_storage_summary(summary: StorageSummary, language: str = "en") -> str:
     categories = "\n".join(
-        text("storage_category_line", language, category=name, bytes=size)
+        text("storage_category_line", language, category=name, bytes=format_bytes(size, language))
         for name, size in summary.categories.items()
     )
-    await message.answer(
-        text(
-            "storage_summary",
-            language,
-            downloads_dir=str(summary.downloads_dir),
-            free_bytes=summary.free_bytes,
-            cleanup_hours=summary.cleanup_max_age_hours,
-            categories=categories,
-        )
+    return text(
+        "storage_summary",
+        language,
+        downloads_dir=str(summary.downloads_dir),
+        free_bytes=format_bytes(summary.free_bytes, language),
+        cleanup_hours=summary.cleanup_max_age_hours,
+        categories=categories,
     )
 
 
@@ -1885,7 +1893,7 @@ async def run_rendered_html_job(job: Job, message: Message) -> None:
             FSInputFile(result.path),
             caption=(
                 f"{text('filename_label', language)}: {result.filename}\n"
-                f"{text('size_label', language)}: {result.size_bytes} bytes\n"
+                f"{text('size_label', language)}: {format_bytes(result.size_bytes, language)}\n"
                 f"{text('final_url_label', language)}: {result.final_url}\n"
                 f"{text('compressed_label', language)}: "
                 f"{text('yes' if result.compressed else 'no', language)}"
@@ -1942,13 +1950,13 @@ def format_download_info(
     return (
         f"{text('filename_label', language)}: {filename}\n"
         f"{text('content_type_label', language)}: {content_type}\n"
-        f"{text('size_label', language)}: {size} bytes\n"
+        f"{text('size_label', language)}: {format_bytes(size, language)}\n"
         f"{text('sha256_label', language)}: {sha256}"
     )
 
 
-def format_detection_size(size: int | None) -> str:
-    return f"{size} bytes" if size is not None else "unknown"
+def format_detection_size(size: int | None, language: str = "en") -> str:
+    return format_bytes(size, language) if size is not None else text("unknown", language)
 
 
 def download_action_for(mode: str, detection: FileDetection, admin: bool) -> str:
@@ -2015,7 +2023,7 @@ async def begin_download_flow(message: Message, user_id: int, url: str) -> None:
             "download_uncertain",
             language,
             content_type=detection.content_type or text("unknown", language),
-            size=format_detection_size(detection.content_length),
+            size=format_detection_size(detection.content_length, language),
             final_url=detection.final_url or url,
             risk=text("download_risk_acceptance", language),
         ),
@@ -2150,7 +2158,7 @@ async def run_screenshot_job(job: Job, message: Message) -> None:
             FSInputFile(result.path),
             caption=(
                 f"{text('filename_label', language)}: {result.filename}\n"
-                f"{text('size_label', language)}: {result.size_bytes} bytes\n"
+                f"{text('size_label', language)}: {format_bytes(result.size_bytes, language)}\n"
                 f"{text('final_url_label', language)}: {result.final_url}"
             ),
         )
@@ -2246,7 +2254,7 @@ async def run_pdf_job(job: Job, message: Message) -> None:
             FSInputFile(result.path),
             caption=(
                 f"{text('filename_label', language)}: {result.filename}\n"
-                f"{text('size_label', language)}: {result.size_bytes} bytes\n"
+                f"{text('size_label', language)}: {format_bytes(result.size_bytes, language)}\n"
                 f"{text('final_url_label', language)}: {result.final_url}"
             ),
         )
