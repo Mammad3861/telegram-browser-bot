@@ -170,6 +170,32 @@ forced_download_jobs: set[str] = set()
 job_tab_ids: dict[str, str] = {}
 POLICY_CATEGORY_NAMES = POLICY_CATEGORIES
 BROWSER_RATE_COMMANDS = {"html", "html_rendered", "rendered_html", "screenshot", "pdf"}
+STORAGE_CATEGORY_LABELS = {
+    "en": {
+        "files": "Files",
+        "screenshots": "Screenshots",
+        "pdf": "PDF",
+        "html": "HTML",
+        "html_rendered": "Rendered HTML",
+        "sessions": "Sessions",
+        "policies": "Policies",
+        "jobs": "Jobs",
+        "ui_sessions": "UI sessions",
+        "browser_tabs": "Browser tabs",
+    },
+    "fa": {
+        "files": "فایل‌ها",
+        "screenshots": "تصویرهای صفحه",
+        "pdf": "PDF",
+        "html": "HTML",
+        "html_rendered": "HTML رندرشده",
+        "sessions": "نشست‌ها",
+        "policies": "سیاست‌ها",
+        "jobs": "کارها",
+        "ui_sessions": "نشست‌های رابط کاربری",
+        "browser_tabs": "تب‌های مرورگر",
+    },
+}
 
 
 def begin_user_input(user_id: int, mode: str) -> None:
@@ -1200,7 +1226,12 @@ async def storage_handler(message: Message) -> None:
 
 def format_storage_summary(summary: StorageSummary, language: str = "en") -> str:
     categories = "\n".join(
-        text("storage_category_line", language, category=name, bytes=format_bytes(size, language))
+        text(
+            "storage_category_line",
+            language,
+            category=storage_category_label(name, language),
+            bytes=format_bytes(size, language),
+        )
         for name, size in summary.categories.items()
     )
     return text(
@@ -1211,6 +1242,11 @@ def format_storage_summary(summary: StorageSummary, language: str = "en") -> str
         cleanup_hours=summary.cleanup_max_age_hours,
         categories=categories,
     )
+
+
+def storage_category_label(category: str, language: str = "en") -> str:
+    labels = STORAGE_CATEGORY_LABELS.get(language, STORAGE_CATEGORY_LABELS["en"])
+    return labels.get(category, category)
 
 
 @router.message(Command("purge_history"))

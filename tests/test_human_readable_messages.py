@@ -29,11 +29,30 @@ def test_storage_output_uses_human_readable_persian_sizes() -> None:
     assert "28.06 کیلوبایت" in output
     assert "28730 بایت" not in output
     assert "9289396224" not in output
+    assert "ui_sessions" not in output
+    assert "نشست‌های رابط کاربری" in output
+    assert "تصویرهای صفحه" in output
+
+
+def test_storage_output_uses_readable_english_labels() -> None:
+    summary = StorageSummary(
+        downloads_dir=Path("downloads"),
+        free_bytes=1024,
+        cleanup_max_age_hours=24,
+        categories={"files": 0, "screenshots": 0, "html_rendered": 0, "ui_sessions": 0},
+    )
+
+    output = format_storage_summary(summary, "en")
+
+    assert "Files: 0 B" in output
+    assert "Screenshots: 0 B" in output
+    assert "Rendered HTML: 0 B" in output
+    assert "UI sessions: 0 B" in output
 
 
 def test_admin_status_uses_human_readable_free_disk() -> None:
     status = AdminStatus(
-        version="1.9.1-alpha.1",
+        version="1.9.2-alpha.1",
         runtime_target="Linux/Ubuntu 24.04 or Docker",
         uptime_seconds=5,
         downloads_dir="downloads",

@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.9.2-alpha.1] - 2026-06-16
+
+### Improved
+
+- Persian `/storage` output now shows readable category labels such as `تصویرهای صفحه` and `نشست‌های رابط کاربری`.
+- English `/storage` output uses readable labels such as `Screenshots`, `Rendered HTML`, and `UI sessions`.
+
 ## [v1.9.1-alpha.1] - 2026-06-16
 
 ### Improved
