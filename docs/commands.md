@@ -73,6 +73,7 @@ Examples:
 | `/deny <telegram_id>` | Remove a runtime allowed user. |
 | `/allowed_users` | List static and runtime allowed users. |
 | `/admin_status` | Show safe runtime and storage diagnostics. |
+| `/setup_check` | Show concise beta setup readiness checks. |
 | `/cleanup` | Delete old generated files. |
 | `/cleanup dry_run` | Show what cleanup would delete without deleting files. |
 | `/storage` | Show downloads directory usage by category. |

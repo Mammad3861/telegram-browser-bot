@@ -61,8 +61,8 @@ from app.core.session_store import (
     load_cookies_for_domain,
     save_cookies,
 )
-from app.core.runtime_status import RUNTIME_TARGET, build_admin_status
-from app.core.runtime_status import AdminStatus
+from app.core.runtime_status import RUNTIME_TARGET, build_admin_status, build_setup_check
+from app.core.runtime_status import AdminStatus, SetupCheck
 from app.core.storage import StorageError
 from app.core.storage_diagnostics import StorageSummary, build_storage_summary
 from app.core.rate_limit import effective_rate_limit, rate_limiter
@@ -1152,6 +1152,39 @@ async def admin_status_handler(message: Message) -> None:
     language = get_language(user_id)
     status = build_admin_status(get_settings(), job_store)
     await message.answer(format_admin_status(status, language))
+
+
+@router.message(Command("setup_check"))
+async def setup_check_handler(message: Message) -> None:
+    user_id = get_user_id(message)
+    if user_id is None or not is_admin(user_id):
+        await message.answer(text("admin_required", get_language(user_id)))
+        return
+    language = get_language(user_id)
+    check = build_setup_check(get_settings())
+    await message.answer(format_setup_check(check, language))
+
+
+def setup_state(value: bool, language: str = "en") -> str:
+    return text("setup_ok" if value else "setup_attention", language)
+
+
+def format_setup_check(check: SetupCheck, language: str = "en") -> str:
+    return text(
+        "setup_check",
+        language,
+        bot_token=setup_state(check.bot_token_configured, language),
+        admin_ids=setup_state(check.admin_ids_configured, language),
+        downloads_writable=setup_state(check.downloads_writable, language),
+        persistent_dirs=setup_state(check.persistent_store_dirs_writable, language),
+        free_disk=setup_state(check.free_disk_ok, language),
+        browser_ready=setup_state(check.browser_ready, language),
+        search_provider=check.search_provider_status,
+        command_menu_mode=check.command_menu_mode,
+        content_policy=text("enabled" if check.content_policy_enabled else "disabled", language),
+        cookie_import=text("enabled" if check.cookie_import_enabled else "disabled", language),
+        health_ready=setup_state(check.health_ready, language),
+    )
 
 
 def format_admin_status(status: AdminStatus, language: str = "en") -> str:

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from app.bot.handlers import format_admin_status, format_storage_summary
-from app.core.runtime_status import AdminStatus
+from app.bot.handlers import format_admin_status, format_setup_check, format_storage_summary
+from app.core.runtime_status import AdminStatus, SetupCheck
 from app.core.storage_diagnostics import StorageSummary
 
 
@@ -52,7 +52,7 @@ def test_storage_output_uses_readable_english_labels() -> None:
 
 def test_admin_status_uses_human_readable_free_disk() -> None:
     status = AdminStatus(
-        version="1.9.2-alpha.1",
+        version="1.10.0-alpha.1",
         runtime_target="Linux/Ubuntu 24.04 or Docker",
         uptime_seconds=5,
         downloads_dir="downloads",
@@ -79,3 +79,48 @@ def test_admin_status_uses_human_readable_free_disk() -> None:
 
     assert "گیگابایت" in output
     assert "9289396224" not in output
+
+
+def test_setup_check_output_redacts_secrets() -> None:
+    check = SetupCheck(
+        bot_token_configured=True,
+        admin_ids_configured=True,
+        downloads_writable=True,
+        persistent_store_dirs_writable=True,
+        free_disk_ok=True,
+        browser_ready=False,
+        search_provider_status="duckduckgo_html",
+        command_menu_mode="auto",
+        content_policy_enabled=True,
+        cookie_import_enabled=False,
+        health_ready=False,
+    )
+
+    output = format_setup_check(check, "en")
+
+    assert "Setup check" in output
+    assert "secret" not in output.lower()
+    assert "token" in output.lower()
+    assert "duckduckgo_html" in output
+
+
+def test_setup_check_persian_output() -> None:
+    check = SetupCheck(
+        bot_token_configured=False,
+        admin_ids_configured=True,
+        downloads_writable=True,
+        persistent_store_dirs_writable=True,
+        free_disk_ok=True,
+        browser_ready=True,
+        search_provider_status="disabled",
+        command_menu_mode="auto",
+        content_policy_enabled=False,
+        cookie_import_enabled=False,
+        health_ready=True,
+    )
+
+    output = format_setup_check(check, "fa")
+
+    assert "بررسی راه‌اندازی" in output
+    assert "نیازمند بررسی" in output
+    assert "disabled" in output

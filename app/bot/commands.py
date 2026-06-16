@@ -39,6 +39,7 @@ def build_admin_commands(language: str = "en") -> list[BotCommand]:
     descriptions = (
         {
             "admin_status": "وضعیت اجرای بات",
+            "setup_check": "بررسی راه‌اندازی",
             "allowed_users": "کاربران مجاز",
             "cleanup": "پاک‌سازی فایل‌های قدیمی",
             "purge_history": "پاک‌سازی تاریخچه کارها",
@@ -50,6 +51,7 @@ def build_admin_commands(language: str = "en") -> list[BotCommand]:
         if language == "fa"
         else {
             "admin_status": "Show runtime status",
+            "setup_check": "Check setup readiness",
             "allowed_users": "List allowed users",
             "cleanup": "Delete old generated files",
             "purge_history": "Clear completed job history",

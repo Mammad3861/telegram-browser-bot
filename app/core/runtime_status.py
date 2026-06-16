@@ -101,6 +101,48 @@ def liveness_payload() -> dict[str, str]:
 
 
 @dataclass(frozen=True)
+class SetupCheck:
+    bot_token_configured: bool
+    admin_ids_configured: bool
+    downloads_writable: bool
+    persistent_store_dirs_writable: bool
+    free_disk_ok: bool
+    browser_ready: bool
+    search_provider_status: str
+    command_menu_mode: str
+    content_policy_enabled: bool
+    cookie_import_enabled: bool
+    health_ready: bool
+
+
+def build_setup_check(settings: Settings) -> SetupCheck:
+    ready = readiness_payload(settings)
+    checks = ready["checks"]
+    search_provider = settings.search_provider.lower()
+    if search_provider not in SEARCH_PROVIDER_REGISTRY:
+        search_status = "invalid"
+    elif search_provider == "brave_api" and not settings.brave_search_api_key:
+        search_status = "misconfigured"
+    elif search_provider == "searxng" and not settings.searxng_base_url:
+        search_status = "misconfigured"
+    else:
+        search_status = search_provider
+    return SetupCheck(
+        bot_token_configured=bool(settings.telegram_bot_token),
+        admin_ids_configured=bool(settings.admin_telegram_ids.strip()),
+        downloads_writable=bool(checks["downloads_writable"]),
+        persistent_store_dirs_writable=bool(checks["persistent_store_dirs_writable"]),
+        free_disk_ok=bool(checks["disk_free_above_minimum"]),
+        browser_ready=bool(checks["browser_features_configured"]),
+        search_provider_status=search_status,
+        command_menu_mode=settings.command_menu_language_mode,
+        content_policy_enabled=settings.enable_content_policy,
+        cookie_import_enabled=cookie_import_is_enabled(settings),
+        health_ready=ready["status"] == "ok",
+    )
+
+
+@dataclass(frozen=True)
 class AdminStatus:
     version: str
     runtime_target: str

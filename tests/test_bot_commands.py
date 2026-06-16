@@ -55,6 +55,7 @@ def test_admin_command_list_builder() -> None:
 
     assert [command.command for command in commands] == [
         "admin_status",
+        "setup_check",
         "allowed_users",
         "cleanup",
         "purge_history",
@@ -70,6 +71,7 @@ def test_persian_admin_command_list_builder() -> None:
 
     assert [command.command for command in commands] == [
         "admin_status",
+        "setup_check",
         "allowed_users",
         "cleanup",
         "purge_history",
@@ -119,7 +121,7 @@ def test_registration_includes_default_localized_and_admin_scopes() -> None:
     assert bot.calls[1]["commands"][1].description == "باز کردن منو"
     admin_calls = bot.calls[2:]
     assert {call["scope"].chat_id for call in admin_calls} == {123, 456}
-    assert all(len(call["commands"]) == 14 for call in admin_calls)
+    assert all(len(call["commands"]) == 15 for call in admin_calls)
     assert all(
         call["commands"][0].description == (
             "شروع بات" if call.get("language_code") == "fa" else "Start the bot"

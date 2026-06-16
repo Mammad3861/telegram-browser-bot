@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.10.0-alpha.1] - 2026-06-16
+
+### Added
+
+- Beta deployment checklist.
+- Alpha migration notes for persistent `downloads/` stores.
+- Release notes template.
+- Admin `/setup_check` readiness command.
+
+### Improved
+
+- Docker Compose healthcheck now uses `/health/ready`.
+- README and deployment docs were polished for beta preparation.
+- Version consistency checks were added.
+
+### Safety
+
+- Setup checks report only safe booleans/status labels and do not print tokens, API keys, cookie values, proxy URLs, or secrets.
+
 ## [v1.9.2-alpha.1] - 2026-06-16
 
 ### Improved

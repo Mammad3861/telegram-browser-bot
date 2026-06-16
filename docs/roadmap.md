@@ -31,3 +31,5 @@ The project remains an alpha Telegram browser utility. Roadmap items are directi
 - Protected streaming media downloading
 - HLS/DASH manifest extraction or stream ripping
 - Username/password credential storage
+
+Some websites may not work fully in a headless browser. The official deployment target remains Docker/Linux; Windows local development is best-effort only.

@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml)
 
-**Current version:** `v1.9.2-alpha.1`
+**Current version:** `v1.10.0-alpha.1`
 
-A Docker-first Telegram bot for safely fetching pages, searching the web, extracting links, downloading direct files, and exporting HTML, screenshots, and PDFs. The supported production target is Ubuntu 24.04 or Docker Compose.
+A Docker-first Telegram bot for safely fetching pages, searching the web, extracting links, downloading direct files, and exporting HTML, screenshots, and PDFs. It is alpha software preparing for beta. The official deployment target is Docker on Linux.
 
 > Alpha software intended for controlled testing. Do not expose it as an unrestricted public service.
 
@@ -56,7 +56,7 @@ curl http://127.0.0.1:18080/health/ready
 
 Advanced slash commands remain available. See the [complete command reference](docs/commands.md).
 
-Admins can use `/admin_status`, `/storage`, and `/cleanup dry_run` for safe beta diagnostics.
+Admins can use `/setup_check`, `/admin_status`, `/storage`, and `/cleanup dry_run` for safe beta diagnostics.
 
 ## Documentation
 
@@ -67,6 +67,9 @@ Admins can use `/admin_status`, `/storage`, and `/cleanup dry_run` for safe beta
 - [Cookie sessions](docs/cookies.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Roadmap](docs/roadmap.md)
+- [Beta checklist](docs/beta-checklist.md)
+- [Migration notes](docs/migrations.md)
+- [Release template](docs/release-template.md)
 - [Changelog](CHANGELOG.md)
 
 ## Security Notes
@@ -79,6 +82,7 @@ Admins can use `/admin_status`, `/storage`, and `/cleanup dry_run` for safe beta
 - Downloads do not rip streams or bypass DRM, CAPTCHA, paywalls, login restrictions, or anti-bot systems. Use downloads only for files you are authorized to receive.
 - Cookie sessions are encrypted locally, isolated by Telegram user and domain, and require a stable encryption key.
 - Username/password login storage and OpenAI/ChatGPT assistant features are not implemented.
+- Windows local development is best-effort only.
 - Persistent data lives under `downloads/`; do not commit it.
 
 ## Roadmap

@@ -311,6 +311,22 @@ TEXTS: dict[str, dict[str, str]] = {
             "Cleanup retention: {cleanup_hours} hours\n\n{categories}"
         ),
         "storage_category_line": "{category}: {bytes}",
+        "setup_ok": "OK",
+        "setup_attention": "needs attention",
+        "setup_check": (
+            "Setup check\n"
+            "Bot token configured: {bot_token}\n"
+            "Admin IDs configured: {admin_ids}\n"
+            "Downloads writable: {downloads_writable}\n"
+            "Persistent stores writable: {persistent_dirs}\n"
+            "Free disk OK: {free_disk}\n"
+            "Browser ready: {browser_ready}\n"
+            "Search provider: {search_provider}\n"
+            "Command menu mode: {command_menu_mode}\n"
+            "Content policy: {content_policy}\n"
+            "Cookie import: {cookie_import}\n"
+            "Health readiness: {health_ready}"
+        ),
         "rate_limited": "You are doing that too often. Try again in about {seconds} seconds.",
         "search_rate_limited": "Search limit reached. Try again in about {seconds} seconds.",
         "browser_rate_limited": "Browser action limit reached. Try again in about {seconds} seconds.",
@@ -631,6 +647,22 @@ TEXTS: dict[str, dict[str, str]] = {
             "نگه‌داری پاک‌سازی: {cleanup_hours} ساعت\n\n{categories}"
         ),
         "storage_category_line": "{category}: {bytes}",
+        "setup_ok": "آماده",
+        "setup_attention": "نیازمند بررسی",
+        "setup_check": (
+            "بررسی راه‌اندازی\n"
+            "توکن بات تنظیم شده: {bot_token}\n"
+            "شناسه مدیران تنظیم شده: {admin_ids}\n"
+            "پوشه دانلودها قابل نوشتن است: {downloads_writable}\n"
+            "پوشه‌های داده پایدار قابل نوشتن‌اند: {persistent_dirs}\n"
+            "فضای آزاد کافی است: {free_disk}\n"
+            "مرورگر آماده است: {browser_ready}\n"
+            "ارائه‌دهنده جست‌وجو: {search_provider}\n"
+            "حالت منوی دستورها: {command_menu_mode}\n"
+            "سیاست محتوا: {content_policy}\n"
+            "ورود کوکی: {cookie_import}\n"
+            "آمادگی سلامت: {health_ready}"
+        ),
         "rate_limited": "این کار را بیش از حد سریع انجام می‌دهید. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
         "search_rate_limited": "سقف جست‌وجو پر شده است. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
         "browser_rate_limited": "سقف عملیات مرورگر پر شده است. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
