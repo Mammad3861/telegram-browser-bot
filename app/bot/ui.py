@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.core.command_args import CommandArgumentError, parse_single_url_arg
+from app.core.url_input import normalize_user_url_input
 from app.core.url_validation import URLValidationError, validate_url
 from app.bot.i18n import text
 
@@ -30,7 +31,10 @@ class URLCallback:
 
 def detect_plain_url(value: str | None) -> str | None:
     try:
-        return validate_url(parse_single_url_arg(value))
+        normalized = normalize_user_url_input(value)
+        if not normalized.is_url or normalized.url is None:
+            return None
+        return validate_url(normalized.url)
     except (CommandArgumentError, URLValidationError):
         return None
 

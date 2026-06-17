@@ -8,7 +8,13 @@ from urllib.parse import urlparse
 from aiogram import F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command, CommandObject
-from aiogram.types import CallbackQuery, FSInputFile, Message
+from aiogram.types import (
+    BotCommandScopeChat,
+    BotCommandScopeDefault,
+    CallbackQuery,
+    FSInputFile,
+    Message,
+)
 
 from app.config import get_settings, parse_telegram_ids
 from app.core.access_control import deny_runtime_user, is_admin, is_allowed_user
@@ -76,6 +82,7 @@ from app.core.routing import (
     set_route_rule,
 )
 from app.core.temp_files import cleanup_sent_file
+from app.core.url_input import normalize_user_url_input
 from app.core.url_sessions import (
     URLSessionExpired,
     URLSessionNotFound,
@@ -286,7 +293,8 @@ def policy_block_message(language: str) -> str:
 
 
 def validate_action_url(url: str, command: str | None = None) -> str:
-    validated = validate_url(url)
+    normalized = normalize_user_url_input(url)
+    validated = validate_url(normalized.url if normalized.is_url and normalized.url else url)
     decision = policy_decision(validated)
     if not decision.allowed:
         raise PermissionError("content_policy_blocked")
@@ -306,6 +314,14 @@ def permission_error_message(error: PermissionError, language: str) -> str:
         else "content_policy_blocked",
         language,
     )
+
+
+def parse_url_command_arg(raw_args: str | None) -> str:
+    value = parse_single_url_arg(raw_args)
+    normalized = normalize_user_url_input(value)
+    if not normalized.is_url or normalized.url is None:
+        raise CommandArgumentError("A valid URL is required")
+    return normalized.url
 
 
 def _command_name(message: Message) -> str:
@@ -1165,25 +1181,36 @@ async def setup_check_handler(message: Message) -> None:
     await message.answer(format_setup_check(check, language))
 
 
-def setup_state(value: bool, language: str = "en") -> str:
-    return text("setup_ok" if value else "setup_attention", language)
+def setup_state(value: bool, language: str = "en", kind: str = "generic") -> str:
+    if language != "fa":
+        return text("setup_ok" if value else "setup_attention", language)
+    labels = {
+        "configured": ("تأیید شد", "تنظیم نشده"),
+        "writable": ("قابل نوشتن", "قابل نوشتن نیست"),
+        "disk": ("کافی", "فضای آزاد کافی نیست"),
+        "browser": ("قابل استفاده", "خطا دارد"),
+        "health": ("تأیید شد", "خطا دارد"),
+        "generic": ("تأیید شد", "خطا دارد"),
+    }
+    ok_label, bad_label = labels.get(kind, labels["generic"])
+    return ok_label if value else bad_label
 
 
 def format_setup_check(check: SetupCheck, language: str = "en") -> str:
     return text(
         "setup_check",
         language,
-        bot_token=setup_state(check.bot_token_configured, language),
-        admin_ids=setup_state(check.admin_ids_configured, language),
-        downloads_writable=setup_state(check.downloads_writable, language),
-        persistent_dirs=setup_state(check.persistent_store_dirs_writable, language),
-        free_disk=setup_state(check.free_disk_ok, language),
-        browser_ready=setup_state(check.browser_ready, language),
+        bot_token=setup_state(check.bot_token_configured, language, "configured"),
+        admin_ids=setup_state(check.admin_ids_configured, language, "configured"),
+        downloads_writable=setup_state(check.downloads_writable, language, "writable"),
+        persistent_dirs=setup_state(check.persistent_store_dirs_writable, language, "writable"),
+        free_disk=setup_state(check.free_disk_ok, language, "disk"),
+        browser_ready=setup_state(check.browser_ready, language, "browser"),
         search_provider=check.search_provider_status,
         command_menu_mode=check.command_menu_mode,
         content_policy=text("enabled" if check.content_policy_enabled else "disabled", language),
         cookie_import=text("enabled" if check.cookie_import_enabled else "disabled", language),
-        health_ready=setup_state(check.health_ready, language),
+        health_ready=setup_state(check.health_ready, language, "health"),
     )
 
 
@@ -1309,6 +1336,42 @@ async def refresh_commands_handler(message: Message) -> None:
             get_language(admin_id),
         )
     )
+
+
+@router.message(Command("debug_commands"))
+async def debug_commands_handler(message: Message) -> None:
+    admin_id = await require_admin(message)
+    if admin_id is None:
+        return
+    language = get_language(admin_id)
+    lines: list[str] = []
+    checks = [
+        ("default", BotCommandScopeDefault(), None),
+        ("default/fa", BotCommandScopeDefault(), "fa"),
+        ("default/en", BotCommandScopeDefault(), "en"),
+        ("admin", BotCommandScopeChat(chat_id=admin_id), None),
+        ("admin/fa", BotCommandScopeChat(chat_id=admin_id), "fa"),
+        ("admin/en", BotCommandScopeChat(chat_id=admin_id), "en"),
+    ]
+    for label, scope, lang in checks:
+        try:
+            kwargs: dict[str, object] = {"scope": scope}
+            if lang:
+                kwargs["language_code"] = lang
+            commands = await message.bot.get_my_commands(**kwargs)
+            rendered = ", ".join(
+                f"/{command.command}: {command.description}" for command in commands[:12]
+            )
+            lines.append(f"{label}: {rendered or text('none', language)}")
+        except Exception as exc:
+            logger.warning(
+                "Telegram command debug failed: scope=%s language=%s exception_type=%s",
+                label,
+                lang or "",
+                type(exc).__name__,
+            )
+            lines.append(f"{label}: {text('request_failed', language, error=type(exc).__name__)}")
+    await message.answer(text("debug_commands", language, commands="\n".join(lines)))
 
 
 def content_policy_path() -> Path:
@@ -1580,7 +1643,7 @@ async def policy_test_handler(message: Message, command: CommandObject) -> None:
         await message.answer(text("policy_usage_test", language))
         return
     try:
-        decision = policy_decision(parse_single_url_arg(command.args))
+        decision = policy_decision(parse_url_command_arg(command.args))
     except (CommandArgumentError, URLValidationError, ValueError) as exc:
         await message.answer(text("request_failed", language, error=str(exc)))
         return
@@ -1678,7 +1741,7 @@ async def route_test_handler(message: Message, command: CommandObject) -> None:
         await message.answer(text("route_test_usage", language))
         return
     try:
-        url = validate_url(parse_single_url_arg(command.args))
+        url = validate_url(parse_url_command_arg(command.args))
         domain = urlparse(url).hostname or ""
         route = route_name_for_url(url)
         if route == "proxy":
@@ -1771,7 +1834,7 @@ async def fetch_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_action_url(parse_single_url_arg(command.args), "fetch")
+        url = validate_action_url(parse_url_command_arg(command.args), "fetch")
         async with HttpFetcher(proxy_url=http_proxy_for_target(url)) as fetcher:
             response = await fetcher.fetch(url)
         body = safe_response_text(response)[:3500]
@@ -1794,7 +1857,7 @@ async def links_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_action_url(parse_single_url_arg(command.args), "links")
+        url = validate_action_url(parse_url_command_arg(command.args), "links")
         async with HttpFetcher(proxy_url=http_proxy_for_target(url)) as fetcher:
             response = await fetcher.fetch(url)
         links = LinkExtractor.extract(safe_response_text(response), str(response.url))
@@ -1819,7 +1882,7 @@ async def html_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_action_url(parse_single_url_arg(command.args), "html")
+        url = validate_action_url(parse_url_command_arg(command.args), "html")
         http_proxy_for_target(url)
         job = create_background_job(message, "html", url)
         await message.answer(text(
@@ -1920,7 +1983,7 @@ async def rendered_html_handler(message: Message, command: CommandObject) -> Non
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_action_url(parse_single_url_arg(command.args), "html_rendered")
+        url = validate_action_url(parse_url_command_arg(command.args), "html_rendered")
         browser_proxy_for_target(url)
         job = create_background_job(message, "html_rendered", url)
         await message.answer(text(
@@ -2112,7 +2175,7 @@ async def download_handler(message: Message, command: CommandObject) -> None:
         return
 
     try:
-        await begin_download_flow(message, user_id, parse_single_url_arg(command.args))
+        await begin_download_flow(message, user_id, parse_url_command_arg(command.args))
     except CommandArgumentError:
         await message.answer(text("url_usage", language, command="download"))
     except PermissionError as exc:
@@ -2186,7 +2249,7 @@ async def screenshot_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_action_url(parse_single_url_arg(command.args), "screenshot")
+        url = validate_action_url(parse_url_command_arg(command.args), "screenshot")
         browser_proxy_for_target(url)
         job = create_background_job(message, "screenshot", url)
         await message.answer(text(
@@ -2284,7 +2347,7 @@ async def pdf_handler(message: Message, command: CommandObject) -> None:
         return
     language = get_language(get_user_id(message))
     try:
-        url = validate_action_url(parse_single_url_arg(command.args), "pdf")
+        url = validate_action_url(parse_url_command_arg(command.args), "pdf")
         browser_proxy_for_target(url)
         job = create_background_job(message, "pdf", url)
         await message.answer(text(
@@ -2740,14 +2803,11 @@ async def text_message_handler(message: Message) -> None:
         await create_url_card(message, user_id, url)
         return
 
-    stripped = message.text.strip()
-    if not stripped.lower().startswith(("http://", "https://")):
+    url = detect_plain_url(message.text)
+    if url is None:
+        await message.answer(text("send_url_or_search", language), reply_markup=menu_keyboard(language))
         return
     if not is_allowed_user(user_id):
         await message.answer(text("access_denied", language))
-        return
-    url = detect_plain_url(message.text)
-    if url is None:
-        await message.answer(text("invalid_url", language))
         return
     await create_url_card(message, user_id, url)

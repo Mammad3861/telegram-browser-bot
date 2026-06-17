@@ -52,7 +52,7 @@ def test_storage_output_uses_readable_english_labels() -> None:
 
 def test_admin_status_uses_human_readable_free_disk() -> None:
     status = AdminStatus(
-        version="1.10.0-alpha.1",
+        version="1.10.1-alpha.1",
         runtime_target="Linux/Ubuntu 24.04 or Docker",
         uptime_seconds=5,
         downloads_dir="downloads",
@@ -122,5 +122,10 @@ def test_setup_check_persian_output() -> None:
     output = format_setup_check(check, "fa")
 
     assert "بررسی راه‌اندازی" in output
-    assert "نیازمند بررسی" in output
+    assert "تنظیم نشده" in output
+    assert "تأیید شد" in output
+    assert "قابل نوشتن" in output
+    assert "کافی" in output
+    assert "قابل استفاده" in output
+    assert "آماده" not in output
     assert "disabled" in output

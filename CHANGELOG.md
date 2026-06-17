@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [v1.10.1-alpha.1] - 2026-06-17
+
+### Fixed
+
+- Plain domains such as `YouTube.com`, `youtube.com/watch?v=abc`, and `www.example.com` now open as URL cards after normalization.
+- Content policy and SSRF validation now run after user URL normalization.
+- `force_fa` Telegram command registration now uses Persian descriptions for no-language default and admin chat scopes.
+- `/refresh_commands` now clears known default, private-chat, administrator, and admin-chat command scopes before registering new commands.
+
+### Improved
+
+- Persian `/setup_check` wording now uses natural status labels such as `تأیید شد`, `قابل نوشتن`, `کافی`, and `قابل استفاده`.
+- Added admin `/debug_commands` for safe command-menu inspection.
+
 ## [v1.10.0-alpha.1] - 2026-06-16
 
 ### Added

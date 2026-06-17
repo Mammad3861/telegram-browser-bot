@@ -47,12 +47,15 @@ def test_rejects_invalid_callback_data(value) -> None:
 
 def test_plain_url_detection_accepts_single_public_url() -> None:
     assert detect_plain_url(" https://example.com/path ") == "https://example.com/path"
+    assert detect_plain_url("YouTube.com") == "https://youtube.com"
+    assert detect_plain_url("youtube.com/watch?v=abc") == "https://youtube.com/watch?v=abc"
 
 
 @pytest.mark.parametrize(
     "value",
     [
         "hello",
+        "hello world",
         "https://example.com https://example.org",
         "https://example.com\nhttps://example.org",
         "http://localhost/private",
@@ -74,12 +77,12 @@ def test_about_text_contains_version_and_runtime_without_secrets() -> None:
     about = text(
         "about",
         "en",
-        version="1.8.0-alpha.1",
+        version="1.10.1-alpha.1",
         runtime_target="Linux/Ubuntu 24.04 or Docker",
     )
 
     assert "Telegram Browser Bot" in about
-    assert "1.8.0-alpha.1" in about
+    assert "1.10.1-alpha.1" in about
     assert "Linux/Ubuntu 24.04 or Docker" in about
     assert "TOKEN" not in about
 

@@ -48,6 +48,54 @@ def test_search_result_blocked_by_policy_is_skipped(tmp_path, monkeypatch) -> No
     assert handlers.is_policy_allowed("https://example.com/result") is True
 
 
+def test_policy_check_runs_after_plain_domain_normalization(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "content_policy.json"
+    save_content_policy(path, ContentPolicy(blocked_domains=["youtube.com"]))
+    settings = Settings(_env_file=None, content_policy_path=str(path))
+    monkeypatch.setattr(handlers, "get_settings", lambda: settings)
+
+    with pytest.raises(PermissionError):
+        handlers.validate_action_url("YouTube.com")
+
+
+def test_url_card_accepts_plain_domain_after_normalization(tmp_path, monkeypatch) -> None:
+    settings = Settings(
+        _env_file=None,
+        enable_content_policy=True,
+        content_policy_path=str(tmp_path / "policy.json"),
+    )
+    monkeypatch.setattr(handlers, "get_settings", lambda: settings)
+    monkeypatch.setattr(handlers, "get_language", lambda user_id: "en")
+
+    class FakeMessage:
+        def __init__(self) -> None:
+            self.answers: list[str] = []
+
+        async def answer(self, value: str, **kwargs):
+            self.answers.append(value)
+            return type("Sent", (), {"message_id": 123})()
+
+    class FakeStore:
+        def __init__(self) -> None:
+            self.created: list[str] = []
+
+        def create(self, user_id: int, url: str):
+            self.created.append(url)
+            return type("Session", (), {"session_id": "abc12345"})()
+
+        def touch(self, *args, **kwargs):
+            return None
+
+    store = FakeStore()
+    monkeypatch.setattr(handlers, "url_session_store", store)
+
+    message = FakeMessage()
+    asyncio.run(handlers.create_url_card(message, 1, "YouTube.com"))
+
+    assert store.created == ["https://youtube.com"]
+    assert "https://youtube.com" in message.answers[0]
+
+
 def test_search_result_category_filter_is_configurable(tmp_path, monkeypatch) -> None:
     path = tmp_path / "content_policy.json"
     category_domains = ContentPolicy().category_domains

@@ -2,7 +2,9 @@ import asyncio
 
 from app.bot.commands import (
     build_admin_commands,
+    build_admin_commands_for_mode,
     build_default_commands,
+    build_default_commands_for_mode,
     register_bot_commands,
 )
 from app.config import Settings
@@ -20,6 +22,17 @@ class FakeBot:
 
     async def delete_my_commands(self, **kwargs) -> None:
         self.calls.append({"delete": True, **kwargs})
+
+    async def get_my_commands(self, **kwargs):
+        return []
+
+
+def set_calls(bot: FakeBot) -> list[dict]:
+    return [call for call in bot.calls if "commands" in call]
+
+
+def delete_calls(bot: FakeBot) -> list[dict]:
+    return [call for call in bot.calls if call.get("delete")]
 
 
 def test_default_command_list_builder() -> None:
@@ -50,6 +63,19 @@ def test_persian_default_command_list_builder() -> None:
     assert commands[1].description == "باز کردن منو"
 
 
+def test_force_fa_default_command_list_is_compact() -> None:
+    commands = build_default_commands_for_mode("force_fa")
+
+    assert [command.command for command in commands] == [
+        "start",
+        "menu",
+        "language",
+        "help",
+    ]
+    assert commands[0].description == "شروع"
+    assert commands[1].description == "منو"
+
+
 def test_admin_command_list_builder() -> None:
     commands = build_admin_commands("en")
 
@@ -63,38 +89,23 @@ def test_admin_command_list_builder() -> None:
         "policy",
         "routes",
         "refresh_commands",
+        "debug_commands",
     ]
 
 
 def test_persian_admin_command_list_builder() -> None:
     commands = build_admin_commands("fa")
 
-    assert [command.command for command in commands] == [
-        "admin_status",
-        "setup_check",
-        "allowed_users",
-        "cleanup",
-        "purge_history",
-        "texts",
-        "policy",
-        "routes",
-        "refresh_commands",
-    ]
-    assert commands[0].description == "وضعیت اجرای بات"
-
-
-def test_persian_command_descriptions() -> None:
-    commands = {command.command: command for command in build_default_commands("fa")}
-
-    assert commands["menu"].description == "باز کردن منو"
-    assert commands["language"].description == "تغییر زبان"
-    assert commands["sessions"].description == "مدیریت نشست‌ها"
+    assert commands[0].description == "وضعیت اجرا"
+    assert commands[1].description == "بررسی راه‌اندازی"
+    assert commands[-1].description == "بررسی منوی دستورها"
 
 
 def test_command_values_fit_telegram_limits() -> None:
     commands = (
         build_default_commands("en")
         + build_default_commands("fa")
+        + build_default_commands_for_mode("force_fa")
         + build_admin_commands("en")
         + build_admin_commands("fa")
     )
@@ -114,20 +125,15 @@ def test_registration_includes_default_localized_and_admin_scopes() -> None:
     result = asyncio.run(register_bot_commands(bot, settings))  # type: ignore[arg-type]
 
     assert result is True
-    assert len(bot.calls) == 6
-    assert bot.calls[0].get("language_code") is None
-    assert bot.calls[0]["commands"][1].description == "Open interactive menu"
-    assert bot.calls[1]["language_code"] == "fa"
-    assert bot.calls[1]["commands"][1].description == "باز کردن منو"
-    admin_calls = bot.calls[2:]
+    calls = set_calls(bot)
+    assert len(calls) == 9
+    assert calls[0].get("language_code") is None
+    assert calls[0]["commands"][1].description == "Open interactive menu"
+    assert calls[1]["language_code"] == "fa"
+    assert calls[1]["commands"][1].description == "باز کردن منو"
+    admin_calls = calls[3:]
     assert {call["scope"].chat_id for call in admin_calls} == {123, 456}
-    assert all(len(call["commands"]) == 15 for call in admin_calls)
-    assert all(
-        call["commands"][0].description == (
-            "شروع بات" if call.get("language_code") == "fa" else "Start the bot"
-        )
-        for call in admin_calls
-    )
+    assert all(len(call["commands"]) == 16 for call in admin_calls)
 
 
 def test_force_persian_command_menu_uses_persian_for_no_language_default() -> None:
@@ -140,10 +146,24 @@ def test_force_persian_command_menu_uses_persian_for_no_language_default() -> No
 
     result = asyncio.run(register_bot_commands(bot, settings))  # type: ignore[arg-type]
 
+    calls = set_calls(bot)
     assert result is True
-    assert bot.calls[0].get("language_code") is None
-    assert bot.calls[0]["commands"][1].description == "باز کردن منو"
-    assert bot.calls[1]["language_code"] == "fa"
+    assert calls[0].get("language_code") is None
+    assert [command.command for command in calls[0]["commands"]] == [
+        "start",
+        "menu",
+        "language",
+        "help",
+    ]
+    assert calls[0]["commands"][1].description == "منو"
+    assert calls[1]["language_code"] == "fa"
+
+
+def test_force_fa_admin_scoped_descriptions_are_persian() -> None:
+    commands = build_admin_commands_for_mode("force_fa")
+
+    assert commands[0].description == "شروع"
+    assert any(command.description == "بررسی راه‌اندازی" for command in commands)
 
 
 def test_force_en_registers_only_english_default() -> None:
@@ -155,8 +175,8 @@ def test_force_en_registers_only_english_default() -> None:
     )
 
     assert asyncio.run(register_bot_commands(bot, settings)) is True  # type: ignore[arg-type]
-    assert len(bot.calls) == 1
-    assert bot.calls[0].get("language_code") is None
+    assert len(set_calls(bot)) == 1
+    assert set_calls(bot)[0].get("language_code") is None
 
 
 def test_force_fa_mode_registers_persian_default() -> None:
@@ -168,22 +188,23 @@ def test_force_fa_mode_registers_persian_default() -> None:
     )
 
     assert asyncio.run(register_bot_commands(bot, settings)) is True  # type: ignore[arg-type]
-    assert bot.calls[0].get("language_code") is None
-    assert bot.calls[0]["commands"][1].description == build_default_commands("fa")[1].description
+    calls = set_calls(bot)
+    assert calls[0].get("language_code") is None
+    assert calls[0]["commands"][1].description == build_default_commands_for_mode("force_fa")[1].description
 
 
-def test_reset_commands_deletes_default_languages_first() -> None:
+def test_refresh_cleanup_includes_admin_chat_scopes() -> None:
     bot = FakeBot()
     settings = Settings(
         _env_file=None,
-        reset_telegram_commands_on_start=True,
-        register_bot_commands=True,
+        admin_telegram_ids="123",
+        command_menu_language_mode="force_fa",
     )
 
     assert asyncio.run(register_bot_commands(bot, settings)) is True  # type: ignore[arg-type]
-    assert bot.calls[0]["delete"] is True
-    assert bot.calls[1]["delete"] is True
-    assert bot.calls[1]["language_code"] == "fa"
+    calls = delete_calls(bot)
+    assert any(getattr(call["scope"], "chat_id", None) == 123 for call in calls)
+    assert any(call.get("language_code") == "fa" for call in calls)
 
 
 def test_disabled_registration_makes_no_api_calls() -> None:

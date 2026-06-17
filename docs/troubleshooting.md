@@ -77,6 +77,8 @@ In `auto` mode, English descriptions are the no-language default and Persian des
 
 Telegram clients may cache command menu updates. Confirm `REGISTER_BOT_COMMANDS=true`, restart the bot, then reopen the chat or restart the Telegram client. Command registration failures are warnings and do not stop polling.
 
+In `force_fa`, default and admin-scoped no-language command descriptions should be Persian. Run `/refresh_commands` to clear and re-register known scopes, then use `/debug_commands` as an admin to inspect the currently registered default and admin command descriptions. Telegram clients may still show cached values for a short time.
+
 ## HTTP And Network Problems
 
 - HTTP 403 usually means the site blocks automated requests.

@@ -48,7 +48,7 @@ These require an administrator or allowed user.
 | `/sessions` | List saved cookie-session domains. |
 | `/delete_session <domain>` | Delete one saved cookie session. |
 
-You can also send a single public URL without a command to create a persistent browser tab card. Its buttons provide Back, Refresh, Links, Screenshot, PDF, HTML, Rendered HTML, direct Download, Page options, and Close actions.
+You can also send a single public URL without a command to create a persistent browser tab card. Full URLs and plain domains such as `example.com` or `YouTube.com` are accepted and normalized to `https://` before safety checks. Its buttons provide Back, Refresh, Links, Screenshot, PDF, HTML, Rendered HTML, direct Download, Page options, and Close actions.
 
 Find downloads scans visible page links for normal file candidates and lets the user choose one. It does not auto-download files, inspect streaming manifests, or extract protected streams. Uncertain attempts show metadata and a risk-acceptance confirmation. Users must download only files they are authorized to receive.
 

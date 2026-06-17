@@ -80,6 +80,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "url_interact_button": "Page options",
         "search_input_prompt": "Send your search text.",
         "url_input_prompt": "Send one public http/https URL.",
+        "send_url_or_search": "Send a valid URL or use the Search button.",
         "interaction_choose": "Selectable page options:",
         "interaction_none": "No selectable page options were found.",
         "interaction_failed": "The page option could not be applied. Try another action.",
@@ -90,6 +91,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "tab_back_unavailable": "There is no previous page in this tab.",
         "commands_refresh_success": "Telegram command menus were refreshed. Client caching may delay updates.",
         "commands_refresh_failed": "Telegram command menus could not be refreshed.",
+        "debug_commands": "Registered command menu summary:\n{commands}",
         "session_expired": "This URL session expired. Please send the URL again.",
         "session_not_owned": "This URL session belongs to another user.",
         "access_denied": "Access denied. Ask the bot owner for access.",
@@ -416,6 +418,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "url_interact_button": "گزینه‌های صفحه",
         "search_input_prompt": "عبارت جست‌وجو را بفرستید.",
         "url_input_prompt": "یک نشانی عمومی http/https بفرستید.",
+        "send_url_or_search": "یک نشانی معتبر بفرستید یا از دکمه جست‌وجو استفاده کنید.",
         "interaction_choose": "گزینه‌های قابل انتخاب صفحه:",
         "interaction_none": "گزینه‌ای پیدا نشد.",
         "interaction_failed": "گزینه صفحه اعمال نشد. گزینه دیگری را امتحان کنید.",
@@ -426,6 +429,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "tab_back_unavailable": "صفحه قبلی در این تب وجود ندارد.",
         "commands_refresh_success": "منوی دستورهای تلگرام تازه‌سازی شد. ممکن است تلگرام تغییرات را با کمی تأخیر نشان دهد.",
         "commands_refresh_failed": "منوی دستورهای تلگرام تازه‌سازی نشد.",
+        "debug_commands": "خلاصه منوی دستورهای ثبت‌شده:\n{commands}",
         "session_expired": "نشست این نشانی منقضی شده است. لطفاً نشانی را دوباره بفرستید.",
         "session_not_owned": "این نشست متعلق به کاربر دیگری است.",
         "access_denied": "دسترسی ندارید. از مدیر بات درخواست دسترسی کنید.",
@@ -647,21 +651,21 @@ TEXTS: dict[str, dict[str, str]] = {
             "نگه‌داری پاک‌سازی: {cleanup_hours} ساعت\n\n{categories}"
         ),
         "storage_category_line": "{category}: {bytes}",
-        "setup_ok": "آماده",
+        "setup_ok": "تأیید شد",
         "setup_attention": "نیازمند بررسی",
         "setup_check": (
             "بررسی راه‌اندازی\n"
-            "توکن بات تنظیم شده: {bot_token}\n"
-            "شناسه مدیران تنظیم شده: {admin_ids}\n"
-            "پوشه دانلودها قابل نوشتن است: {downloads_writable}\n"
-            "پوشه‌های داده پایدار قابل نوشتن‌اند: {persistent_dirs}\n"
-            "فضای آزاد کافی است: {free_disk}\n"
-            "مرورگر آماده است: {browser_ready}\n"
+            "توکن بات: {bot_token}\n"
+            "شناسه مدیران: {admin_ids}\n"
+            "پوشه دانلودها: {downloads_writable}\n"
+            "پوشه‌های داده پایدار: {persistent_dirs}\n"
+            "فضای آزاد: {free_disk}\n"
+            "مرورگر: {browser_ready}\n"
             "ارائه‌دهنده جست‌وجو: {search_provider}\n"
             "حالت منوی دستورها: {command_menu_mode}\n"
             "سیاست محتوا: {content_policy}\n"
             "ورود کوکی: {cookie_import}\n"
-            "آمادگی سلامت: {health_ready}"
+            "وضعیت سلامت: {health_ready}"
         ),
         "rate_limited": "این کار را بیش از حد سریع انجام می‌دهید. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
         "search_rate_limited": "سقف جست‌وجو پر شده است. حدود {seconds} ثانیه دیگر دوباره تلاش کنید.",
