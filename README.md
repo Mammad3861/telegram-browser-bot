@@ -1,6 +1,6 @@
 # Telegram Browser Bot
 
-[![CI](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/mammad3861/telegram-browser-bot/actions/workflows/ci.yml)
+[![CI](https://github.com/Mammad3861/Telegram-Browser-Bot/actions/workflows/ci.yml/badge.svg)](https://github.com/Mammad3861/Telegram-Browser-Bot/actions/workflows/ci.yml)
 
 **Current version:** `v1.10.1-alpha.1`
 
@@ -23,7 +23,7 @@ A Docker-first Telegram bot for safely fetching pages, searching the web, extrac
 ## Quick Start
 
 ```bash
-git clone https://github.com/mammad3861/telegram-browser-bot.git
+git clone https://github.com/Mammad3861/Telegram-Browser-Bot.git
 cd telegram-browser-bot
 cp .env.example .env
 mkdir -p downloads

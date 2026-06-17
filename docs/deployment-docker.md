@@ -12,7 +12,7 @@ Ubuntu 24.04 with Docker Compose is the supported production-like deployment tar
 ## Deploy
 
 ```bash
-git clone https://github.com/mammad3861/telegram-browser-bot.git
+git clone https://github.com/Mammad3861/Telegram-Browser-Bot.git
 cd telegram-browser-bot
 cp .env.example .env
 ```

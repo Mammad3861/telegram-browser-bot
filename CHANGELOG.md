@@ -15,6 +15,7 @@ All notable changes to this project are documented in this file.
 
 - Persian `/setup_check` wording now uses natural status labels such as `تأیید شد`, `قابل نوشتن`, `کافی`, and `قابل استفاده`.
 - Added admin `/debug_commands` for safe command-menu inspection.
+- Standardized public GitHub repository links and badges to `Mammad3861/Telegram-Browser-Bot`.
 
 ## [v1.10.0-alpha.1] - 2026-06-16
 
